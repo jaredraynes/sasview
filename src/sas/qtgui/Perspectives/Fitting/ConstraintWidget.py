@@ -1,5 +1,4 @@
-import os
-import sys
+import logging
 
 from twisted.internet import threads
 
@@ -99,9 +98,16 @@ class ConstraintWidget(QtWidgets.QWidget, Ui_ConstraintWidgetUI):
         """
         Intercept update signals from fitting tabs
         """
-        if tab is not None:
-            ObjectLibrary.getObject(tab).constraintAddedSignal.connect(self.initializeFitList)
-            ObjectLibrary.getObject(tab).newModelSignal.connect(self.initializeFitList)
+        if tab is None:
+            return
+        tab_object = ObjectLibrary.getObject(tab)
+
+        # Disconnect all local slots
+        tab_object.disconnect()
+
+        # Reconnect tab signals to local slots
+        tab_object.constraintAddedSignal.connect(self.initializeFitList)
+        tab_object.newModelSignal.connect(self.initializeFitList)
 
     def onFitTypeChange(self, checked):
         """
@@ -132,8 +138,8 @@ class ConstraintWidget(QtWidgets.QWidget, Ui_ConstraintWidgetUI):
         tabs_to_fit = self.getTabsForFit()
 
         # Single fitter for the simultaneous run
-        sim_fitter = Fit()
-        sim_fitter.fitter_id = self.page_id
+        fitter = Fit()
+        fitter.fitter_id = self.page_id
 
         # Notify the parent about fitting started
         self.parent.fittingStartedSignal.emit(tabs_to_fit)
@@ -142,7 +148,7 @@ class ConstraintWidget(QtWidgets.QWidget, Ui_ConstraintWidgetUI):
         #
         page_ids = []
         fitter_id = 0
-        sim_fitter=[sim_fitter]
+        sim_fitter_list=[fitter]
         # Prepare the fitter object
         try:
             for tab in tabs_to_fit:
@@ -150,16 +156,16 @@ class ConstraintWidget(QtWidgets.QWidget, Ui_ConstraintWidgetUI):
                 if tab_object is None:
                     # No such tab!
                     return
-                sim_fitter, fitter_id = tab_object.prepareFitters(fitter=sim_fitter[0], fit_id=fitter_id)
+                sim_fitter_list, fitter_id = tab_object.prepareFitters(fitter=sim_fitter_list[0], fit_id=fitter_id)
                 page_ids.append([tab_object.page_id])
-        except ValueError as ex:
+        except ValueError:
             # No parameters selected in one of the tabs
             no_params_msg = "Fitting can not be performed.\n" +\
                             "Not all tabs chosen for fitting have parameters selected for fitting."
-            reply = QtWidgets.QMessageBox.question(self,
-                                               'Warning',
-                                               no_params_msg,
-                                               QtWidgets.QMessageBox.Ok)
+            QtWidgets.QMessageBox.question(self,
+                                           'Warning',
+                                            no_params_msg,
+                                            QtWidgets.QMessageBox.Ok)
 
             return
 
@@ -180,7 +186,7 @@ class ConstraintWidget(QtWidgets.QWidget, Ui_ConstraintWidgetUI):
 
         # new fit thread object
         calc_fit = FitThread(handler=handler,
-                             fn=sim_fitter,
+                             fn=sim_fitter_list,
                              batch_inputs=batch_inputs,
                              batch_outputs=batch_outputs,
                              page_id=page_ids,
@@ -293,6 +299,12 @@ class ConstraintWidget(QtWidgets.QWidget, Ui_ConstraintWidgetUI):
         # Notify the parent about completed fitting
         self.parent.fittingStoppedSignal.emit(self.getTabsForFit())
 
+        # Assure the fitting succeeded
+        if result is None or not result:
+            msg = "Fitting failed. Please ensure correctness of chosen constraints."
+            self.parent.communicate.statusBarUpdateSignal.emit(msg)
+            return
+
         # get the elapsed time
         elapsed = result[1]
 
@@ -335,8 +347,6 @@ class ConstraintWidget(QtWidgets.QWidget, Ui_ConstraintWidgetUI):
         msg = "Fitting completed successfully in: %s s.\n" % GuiUtils.formatNumber(elapsed)
         self.parent.communicate.statusBarUpdateSignal.emit(msg)
 
-        pass
-
     def onFitFailed(self, reason):
         """
         Respond to fitting failure.
@@ -350,7 +360,6 @@ class ConstraintWidget(QtWidgets.QWidget, Ui_ConstraintWidgetUI):
 
         msg = "Fitting failed: %s s.\n" % reason
         self.parent.communicate.statusBarUpdateSignal.emit(msg)
-        pass
  
     def isTabImportable(self, tab):
         """
@@ -374,7 +383,6 @@ class ConstraintWidget(QtWidgets.QWidget, Ui_ConstraintWidgetUI):
             return
         # Select for fitting
         param_string = "Fit Page " if num_rows==1 else "Fit Pages "
-        to_string = "to its current value" if num_rows==1 else "to their current values"
 
         self.actionSelect = QtWidgets.QAction(self)
         self.actionSelect.setObjectName("actionSelect")
@@ -420,7 +428,6 @@ class ConstraintWidget(QtWidgets.QWidget, Ui_ConstraintWidgetUI):
             return
         # Select for fitting
         param_string = "constraint " if num_rows==1 else "constraints "
-        to_string = "to its current value" if num_rows==1 else "to their current values"
 
         self.actionSelect = QtWidgets.QAction(self)
         self.actionSelect.setObjectName("actionSelect")
@@ -541,22 +548,23 @@ class ConstraintWidget(QtWidgets.QWidget, Ui_ConstraintWidgetUI):
             item.setCheckState(QtCore.Qt.Checked)
             self.tabs_for_fitting[tab_name] = True
 
+        # Disable signals so we don't get infinite call recursion
+        self.tblTabList.blockSignals(True)
         self.tblTabList.setItem(pos, 0, item)
         self.tblTabList.setItem(pos, 1, self.uneditableItem(model_name))
         self.tblTabList.setItem(pos, 2, self.uneditableItem(model_filename))
         # Moniker is editable, so no option change
         item = QtWidgets.QTableWidgetItem(moniker)
-        # Disable signals so we don't get infinite call recursion
-        self.tblTabList.blockSignals(True)
         self.tblTabList.setItem(pos, 3, item)
         self.tblTabList.blockSignals(False)
 
         # Check if any constraints present in tab
-        constraint_names = fit_page.getConstraintsForModel()
+        constraint_names = fit_page.getComplexConstraintsForModel()
         constraints = fit_page.getConstraintObjectsForModel()
         if not constraints: 
             return
         self.tblConstraints.setEnabled(True)
+        self.tblConstraints.blockSignals(True)
         for constraint, constraint_name in zip(constraints, constraint_names):
             # Create the text for widget item
             label = moniker + ":"+ constraint_name[0] + " = " + constraint_name[1]
@@ -569,6 +577,7 @@ class ConstraintWidget(QtWidgets.QWidget, Ui_ConstraintWidgetUI):
             item.setCheckState(QtCore.Qt.Checked)
             self.tblConstraints.insertRow(pos)
             self.tblConstraints.setItem(pos, 0, item)
+        self.tblConstraints.blockSignals(False)
 
     def initializeFitList(self):
         """
@@ -618,6 +627,9 @@ class ConstraintWidget(QtWidgets.QWidget, Ui_ConstraintWidgetUI):
         return True
 
     def getObjectByName(self, name):
+        """
+        Given name of the fit, returns associated fit object
+        """
         for object_name in ObjectLibrary.listObjects():
             object = ObjectLibrary.getObject(object_name)
             if isinstance(object, FittingWidget):

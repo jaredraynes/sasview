@@ -23,7 +23,6 @@ from sas.sascalc.fit.BumpsFitting import BumpsFit as Fit
 
 import sas.qtgui.Utilities.GuiUtils as GuiUtils
 import sas.qtgui.Utilities.LocalConfig as LocalConfig
-from sas.qtgui.Utilities.GridPanel import  BatchOutputPanel
 from sas.qtgui.Utilities.CategoryInstaller import CategoryInstaller
 from sas.qtgui.Plotting.PlotterData import Data1D
 from sas.qtgui.Plotting.PlotterData import Data2D
@@ -558,6 +557,8 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         Show the constraint widget and receive the expression
         """
         selected_rows = self.lstParams.selectionModel().selectedRows()
+        # There have to be only two rows selected. The caller takes care of that
+        # but let's check the correctness.
         assert(len(selected_rows)==2)
 
         params_list = [s.data() for s in selected_rows]
@@ -572,25 +573,13 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         # widget.params[0] is the parameter we're constraining
         constraint.param = mc_widget.params[0]
         # Function should have the model name preamble
-        constraint.func = c_text
-
-        # Create a new item and add the Constraint object as a child
-        item = QtGui.QStandardItem()
-        item.setData(constraint)
-
+        model_name = self.kernel_module.name
+        constraint.func = model_name + "." + c_text
         # Which row is the constrained parameter in?
         row = self.getRowFromName(constraint.param)
-        self._model_model.item(row, 1).setChild(0, item)
-        self.constraintAddedSignal.emit([row])
 
-        # Show visual hints for the constraint
-        font = QtGui.QFont()
-        font.setItalic(True)
-        brush = QtGui.QBrush(QtGui.QColor('blue'))
-        self.modifyViewOnRow(row, font=font, brush=brush)
-
-        # Notify the user
-        self.communicate.statusBarUpdateSignal.emit('Constraints added')
+        # Create a new item and add the Constraint object as a child
+        self.addConstraintToRow(constraint=constraint, row=row)
 
     def getRowFromName(self, name):
         """
@@ -656,17 +645,22 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         for row in self.selectedParameters():
             param = self._model_model.item(row, 0).text()
             value = self._model_model.item(row, 1).text()
-            min = self._model_model.item(row, min_col).text()
-            max = self._model_model.item(row, max_col).text()
+            min_t = self._model_model.item(row, min_col).text()
+            max_t = self._model_model.item(row, max_col).text()
             # Create a Constraint object
-            constraint = Constraint(param=param, value=value, min=min, max=max, func=value)
+            constraint = Constraint(param=param, value=value, min=min_t, max=max_t)
             # Create a new item and add the Constraint object as a child
             item = QtGui.QStandardItem()
             item.setData(constraint)
             self._model_model.item(row, 1).setChild(0, item)
+            # Assumed correctness from the validator
+            value = float(value)
+            # BUMPS calculates log(max-min) without any checks, so let's assign minor range
+            min_v = value - (value/10000.0)
+            max_v = value + (value/10000.0)
             # Set min/max to the value constrained
-            self._model_model.item(row, min_col).setText(value)
-            self._model_model.item(row, max_col).setText(value)
+            self._model_model.item(row, min_col).setText(str(min_v))
+            self._model_model.item(row, max_col).setText(str(max_v))
             self.constraintAddedSignal.emit([row])
             # Show visual hints for the constraint
             font = QtGui.QFont()
@@ -674,7 +668,6 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
             brush = QtGui.QBrush(QtGui.QColor('blue'))
             self.modifyViewOnRow(row, font=font, brush=brush)
         self.communicate.statusBarUpdateSignal.emit('Constraint added')
-        pass
 
     def deleteConstraint(self):
         """
@@ -710,11 +703,8 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
             item.removeRow(0)
             self.constraintAddedSignal.emit([row])
             self.modifyViewOnRow(row)
-            break
 
         self.communicate.statusBarUpdateSignal.emit('Constraint removed')
-        pass
-
 
     def getConstraintForRow(self, row):
         """
@@ -734,13 +724,24 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         item = self._model_model.item(row,1)
         if item.hasChildren():
             c = item.child(0).data()
-            if isinstance(c, Constraint) and c.func:
+            if isinstance(c, Constraint):
                 return True
         return False
 
     def rowHasActiveConstraint(self, row):
         """
         Finds out if row of the main model has an active constraint child
+        """
+        item = self._model_model.item(row,1)
+        if item.hasChildren():
+            c = item.child(0).data()
+            if isinstance(c, Constraint) and c.active:
+                return True
+        return False
+
+    def rowHasActiveComplexConstraint(self, row):
+        """
+        Finds out if row of the main model has an active, nontrivial constraint child
         """
         item = self._model_model.item(row,1)
         if item.hasChildren():
@@ -775,7 +776,6 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         # Convert to proper indices and set requested enablement
         for row in self.selectedParameters():
             self._model_model.item(row, 0).setCheckState(status)
-        pass # debugger hook
 
     def getConstraintsForModel(self):
         """
@@ -783,19 +783,23 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         ('constrained parameter', 'function to constrain')
         e.g. [('sld','5*sld_solvent')]
         """
-        model_name = self.kernel_module.name
         param_number = self._model_model.rowCount()
-        def preamble(s):
-            func = self._model_model.item(s, 1).child(0).data().func
-            value = self._model_model.item(s, 1).child(0).data().value
-            if func == value:
-                return ""
-
-            return model_name + "."
         params = [(self._model_model.item(s, 0).text(),
-                    #preamble(s) +self._model_model.item(s, 1).child(0).data().func)
                     self._model_model.item(s, 1).child(0).data().func)
                     for s in range(param_number) if self.rowHasActiveConstraint(s)]
+        return params
+
+    def getComplexConstraintsForModel(self):
+        """
+        Return a list of tuples. Each tuple contains constraints mapped as
+        ('constrained parameter', 'function to constrain')
+        e.g. [('sld','5*M2.sld_solvent')].
+        Only for constraints with defined VALUE
+        """
+        param_number = self._model_model.rowCount()
+        params = [(self._model_model.item(s, 0).text(),
+                    self._model_model.item(s, 1).child(0).data().func)
+                    for s in range(param_number) if self.rowHasActiveComplexConstraint(s)]
         return params
 
     def getConstraintObjectsForModel(self):
@@ -878,8 +882,6 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
                 if old_name in func:
                     new_func = func.replace(old_name, new_name)
                     self._model_model.item(row, 1).child(0).data().func = new_func
-
-        pass
 
     def updateData(self):
         """
@@ -1145,7 +1147,6 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         """
         #re-enable the Fit button
         self.setFittingStopped()
-
         # Show the grid panel
         self.grid_window = BatchOutputPanel(parent=self, output_data=result[0])
         self.grid_window.show()
@@ -1158,7 +1159,11 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         #re-enable the Fit button
         self.setFittingStopped()
 
-        assert result is not None
+        #assert result is not None
+        if assert in None:
+            msg = "Fitting failed after: %s s.\n" % GuiUtils.formatNumber(elapsed)
+            self.communicate.statusBarUpdateSignal.emit(msg)
+            return
 
         res_list = result[0][0]
         res = res_list[0]
@@ -1221,7 +1226,7 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         # deal with it until Python gets discriminated unions
         smearing, accuracy, smearing_min, smearing_max = self.smearing_widget.state()
 
-        constraints = self.getConstraintsForModel()
+        constraints = self.getComplexConstraintsForModel()
         smearer = None
         handler = None
         batch_inputs = {}
