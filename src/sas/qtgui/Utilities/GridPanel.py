@@ -56,6 +56,9 @@ class BatchOutputPanel(QtWidgets.QMainWindow, Ui_GridPanelUI):
 
         self.data = output_data
         self.parent = parent
+        if hasattr(self.parent, "communicate"):
+            self.communicate = parent.communicate
+
         self.addToolbarActions()
 
         # Main parameter table
@@ -76,6 +79,10 @@ class BatchOutputPanel(QtWidgets.QMainWindow, Ui_GridPanelUI):
 
         # file name for the dataset
         self.grid_filename = ""
+
+        # context menu on the table
+        self.tblParams.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.tblParams.customContextMenuRequested.connect(self.showContextMenu)
 
     def addToolbarActions(self):
         """
@@ -112,16 +119,74 @@ class BatchOutputPanel(QtWidgets.QMainWindow, Ui_GridPanelUI):
 
         self.setupTableFromCSV(lines)
 
-    def dataFromTable(self):
+    def showContextMenu(self, position):
+        """
+        Show context specific menu in the tab table widget.
+        """
+        menu = QtWidgets.QMenu()
+        rows = [s.row() for s in self.tblParams.selectionModel().selectedRows()]
+        num_rows = len(rows)
+        if num_rows <= 0:
+            return
+        #items = self.tblParams.selectedItems()
+        #num_items = len(items)
+        #if num_items <= 0:
+        #    return
+        # Find out which items got selected and in which row
+        # Select for fitting
+
+        self.actionPlotResults = QtWidgets.QAction(self)
+        self.actionPlotResults.setObjectName("actionPlot")
+        self.actionPlotResults.setText(QtCore.QCoreApplication.translate("self", "Plot selected fits."))
+
+        menu.addAction(self.actionPlotResults)
+
+        # Define the callbacks
+        self.actionPlotResults.triggered.connect(self.plotFits)
+        try:
+            menu.exec_(self.tblParams.viewport().mapToGlobal(position))
+        except AttributeError as ex:
+            logging.error("Error generating context menu: %s" % ex)
+        return
+
+    def plotFits(self):
+        """
+        Plot selected fits by sending signal to the parent
+        """
+        rows = [s.row() for s in self.tblParams.selectionModel().selectedRows()]
+        data = self.dataFromTable(self.tblParams)
+        # data['Data'] -> ['filename1', 'filename2', ...]
+        # look for the 'Data' column and extract the filename
+        for row in rows:
+            try:
+                filename = data['Data'][row]
+                # emit a signal so the plots are being shown
+                self.communicate.plotFromFilenameSignal.emit(filename)
+            except (IndexError, AttributeError):
+                # data messed up.
+                return
+
+    def filenameFromTable(self, table):
+        """
+        Given a QTableWidget find the column number corresponding to the filename
+        """
+        for column in range(self.tblParams.columnCount()):
+            value = [self.tblParams.item(row, column).data(0) for row in range(self.tblParams.rowCount())]
+            key = self.tblParams.horizontalHeaderItem(column).data(0)
+            params[key] = value
+        return params
+
+    def dataFromTable(self, table):
         """
         Creates a dictionary {<parameter>:[list of values]} from the parameter table
         """
+        assert(isinstance(table, QtWidgets.QTableWidget))
         params = {}
         #return {"sld_solvent":[1.2, 2.0, 0.0], "scale":[1.0, 2.0, 3.0]}
-        for column in range(self.tblParams.columnCount()):
+        for column in range(table.columnCount()):
             #pass
-            value = [self.tblParams.item(row, column).data(0) for row in range(self.tblParams.rowCount())]
-            key = self.tblParams.horizontalHeaderItem(column).data(0)
+            value = [table.item(row, column).data(0) for row in range(table.rowCount())]
+            key = table.horizontalHeaderItem(column).data(0)
             params[key] = value
         return params
 

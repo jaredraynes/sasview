@@ -212,6 +212,9 @@ class Communicate(QtCore.QObject):
     # Old "NewPlotEvent"
     plotRequestedSignal = QtCore.pyqtSignal(list)
 
+    # Plot from file names
+    plotFromFilenameSignal = QtCore.pyqtSignal(str)
+
     # Plot update requested from a perspective
     plotUpdateSignal = QtCore.pyqtSignal(list)
 

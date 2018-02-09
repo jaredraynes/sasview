@@ -357,6 +357,7 @@ class GuiManager(object):
         self.communicate.perspectiveChangedSignal.connect(self.perspectiveChanged)
         self.communicate.updateTheoryFromPerspectiveSignal.connect(self.updateTheoryFromPerspective)
         self.communicate.plotRequestedSignal.connect(self.showPlot)
+        self.communicate.plotFromFilenameSignal.connect(self.showPlotFromFilename)
         self.communicate.updateModelFromDataOperationPanelSignal.connect(self.updateModelFromDataOperationPanel)
 
     def addTriggers(self):
@@ -778,6 +779,13 @@ class GuiManager(object):
 
         self.filesWidget.model.appendRow(new_item)
         self._data_manager.add_data(new_datalist_item)
+
+    def showPlotFromFilename(self, filename):
+        """
+        Pass the show plot request to the data explorer
+        """
+        if hasattr(self, "filesWidget"):
+            self.filesWidget.displayFile(filename=filename, is_data=True)
 
     def showPlot(self, plot):
         """
