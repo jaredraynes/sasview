@@ -43,6 +43,7 @@ from Calculators.UnitTesting import DataOperationUtilityTest
 # Utilities
 from Utilities.UnitTesting import GuiUtilsTest
 from Utilities.UnitTesting import SasviewLoggerTest
+from Utilities.UnitTesting import GridPanelTest
 
 # Unit Testing
 from UnitTesting import TestUtilsTest
@@ -98,6 +99,7 @@ def suite():
         unittest.makeSuite(GuiUtilsTest.GuiUtilsTest,             'test'),
         unittest.makeSuite(GuiUtilsTest.DoubleValidatorTest,      'test'),
         unittest.makeSuite(GuiUtilsTest.HashableStandardItemTest, 'test'),
+        unittest.makeSuite(GridPanelTest.BatchOutputPanelTest,    'test'),
 
         # Calculators
         unittest.makeSuite(KiessigCalculatorTest.KiessigCalculatorTest,                     'test'),
