@@ -18,6 +18,7 @@ import sas.qtgui.Utilities.LocalConfig as LocalConfig
 import sas.qtgui.Utilities.GuiUtils as GuiUtils
 
 import sas.qtgui.Utilities.ObjectLibrary as ObjectLibrary
+from sas.qtgui.Utilities.TabbedModelEditor import TabbedModelEditor
 from sas.qtgui.MainWindow.UI.AcknowledgementsUI import Ui_Acknowledgements
 from sas.qtgui.MainWindow.AboutBox import AboutBox
 from sas.qtgui.MainWindow.WelcomePanel import WelcomePanel
@@ -665,8 +666,10 @@ class GuiManager(object):
     def actionEdit_Custom_Model(self):
         """
         """
-        print("actionEdit_Custom_Model TRIGGERED")
-        pass
+        self.model_editor = TabbedModelEditor(self)
+        self.model_editor.show()
+        #print("actionEdit_Custom_Model TRIGGERED")
+        #pass
 
     #============ ANALYSIS =================
     def actionFitting(self):
