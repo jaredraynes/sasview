@@ -74,12 +74,13 @@
            </row>
            <column>
             <property name="text">
-             <string>Parameter</string>
+             <string>Parameters</string>
             </property>
            </column>
            <column>
             <property name="text">
-             <string>Value</string>
+             <string>Initial
+value</string>
             </property>
            </column>
           </widget>
@@ -102,12 +103,13 @@
            </row>
            <column>
             <property name="text">
-             <string>Parameter</string>
+             <string>Parameters</string>
             </property>
            </column>
            <column>
             <property name="text">
-             <string>Value</string>
+             <string>Initial
+value</string>
             </property>
            </column>
           </widget>
