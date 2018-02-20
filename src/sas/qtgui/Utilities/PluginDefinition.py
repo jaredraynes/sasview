@@ -7,9 +7,8 @@ from PyQt5 import QtCore
 from PyQt5 import QtGui
 from PyQt5 import QtWidgets
 
-import sas.qtgui.Utilities.GuiUtils as GuiUtils
-
 from sas.qtgui.Utilities.UI.PluginDefinitionUI import Ui_PluginDefinition
+from sas.qtgui.Utilities.PythonSyntax import PythonHighlighter
 
 # txtName
 # txtDescription
@@ -30,12 +29,11 @@ class PluginDefinition(QtWidgets.QDialog, Ui_PluginDefinition):
         self.setupUi(self)
 
         # globals
-        # model - internal representation of the new model plugin
-        #self.model = {}
         self.initializeModel()
         # internal representation of the parameter list
         # {<row>: (<parameter>, <value>)}
         self.parameter_dict = {}
+        self.pd_parameter_dict = {}
 
         # Initialize signals
         self.addSignals()
@@ -47,8 +45,16 @@ class PluginDefinition(QtWidgets.QDialog, Ui_PluginDefinition):
         """
         Initialize various widgets in the dialog
         """
+        # Set the tooltip
+        hint_function = "#Example:\n\n"
+        hint_function += "if x <= 0:\n"
+        hint_function += "    y = A + B\n"
+        hint_function += "else:\n"
+        hint_function += "    y = A + B * cos(2 * pi * x)\n"
+        hint_function += "return y\n"
+        self.txtFunction.setToolTip(hint_function)
         # Initial text in the function table
-        text =\
+        text = \
 """y = x
 
 return y
@@ -62,6 +68,7 @@ return y
 
         txt_validator = QtGui.QRegExpValidator(rx)
         self.txtName.setValidator(txt_validator)
+        self.highlight = PythonHighlighter(self.txtFunction.document())        
 
     def initializeModel(self):
         """
@@ -127,8 +134,22 @@ return y
         """
         Respond to changes in non-polydisperse parameter table
         """
-        logging.info("onParamsPDChanged TRIGGERED")
-        pass
+        param = value = None
+        if self.tblParamsPD.item(row, 0):
+            param = self.tblParamsPD.item(row, 0).data(0)
+        if self.tblParamsPD.item(row, 1):
+            value = self.tblParamsPD.item(row, 1).data(0)
+
+        # If modified, just update the dict
+        self.pd_parameter_dict[row] = (param, value)
+        self.model['pd_parameters'] = self.pd_parameter_dict
+
+        # Check if the update was Value for last row. If so, add a new row
+        if column == 1 and row == self.tblParamsPD.rowCount()-1:
+            # Add a row
+            self.tblParamsPD.insertRow(self.tblParamsPD.rowCount())
+        self.modelModified.emit()
+
 
     def onFunctionChanged(self):
         """

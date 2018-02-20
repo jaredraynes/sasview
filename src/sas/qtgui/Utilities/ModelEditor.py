@@ -50,4 +50,9 @@ class ModelEditor(QtWidgets.QDialog, Ui_ModelEditor):
             self.modelModified.emit()
         pass
 
+    def getModel(self):
+        """
+        Return the current model, as displayed in the window
+        """
+        return self.txtEditor.toPlainText()
 

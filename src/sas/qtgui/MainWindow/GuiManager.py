@@ -407,6 +407,7 @@ class GuiManager(object):
         self._workspace.actionGPU_Options.triggered.connect(self.actionGPU_Options)
         self._workspace.actionFit_Results.triggered.connect(self.actionFit_Results)
         self._workspace.actionChain_Fitting.triggered.connect(self.actionChain_Fitting)
+        self._workspace.actionAdd_Custom_Model.triggered.connect(self.actionAdd_Custom_Model)
         self._workspace.actionEdit_Custom_Model.triggered.connect(self.actionEdit_Custom_Model)
         # Window
         self._workspace.actionCascade.triggered.connect(self.actionCascade)
@@ -663,13 +664,17 @@ class GuiManager(object):
         print("actionChain_Fitting TRIGGERED")
         pass
 
-    def actionEdit_Custom_Model(self):
+    def actionAdd_Custom_Model(self):
         """
         """
         self.model_editor = TabbedModelEditor(self)
         self.model_editor.show()
-        #print("actionEdit_Custom_Model TRIGGERED")
-        #pass
+
+    def actionEdit_Custom_Model(self):
+        """
+        """
+        self.model_editor = TabbedModelEditor(self, edit_only=True)
+        self.model_editor.show()
 
     #============ ANALYSIS =================
     def actionFitting(self):

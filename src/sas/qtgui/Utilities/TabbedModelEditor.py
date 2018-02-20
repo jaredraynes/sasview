@@ -5,14 +5,13 @@ import types
 import datetime
 import numpy as np
 import webbrowser
+import logging
 
 from PyQt5 import QtCore
 from PyQt5 import QtGui
 from PyQt5 import QtWidgets
 
 from sas.sascalc.fit import models
-
-import sas.qtgui.Utilities.GuiUtils as GuiUtils
 
 from sas.qtgui.Utilities.UI.TabbedModelEditor import Ui_TabbedModelEditor
 from sas.qtgui.Utilities.PluginDefinition import PluginDefinition
@@ -26,7 +25,7 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
     """
     # Signals for intertab communication plugin -> editor
     sasmodelChangedSignal = QtCore.pyqtSignal()
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, edit_only=False):
         super(TabbedModelEditor, self).__init__()
 
         self.parent = parent
@@ -34,17 +33,22 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
         self.setupUi(self)
 
         # globals
-        self.sasmodel = None
         self.filename = ""
+        self.window_title = self.windowTitle()
+        self.edit_only = edit_only
+        self.is_modified = False
 
-        self.addTabs()
+        self.addWidgets()
 
         self.addSignals()
 
-    def addTabs(self):
+    def addWidgets(self):
         """
         Populate tabs with widgets
         """
+        # Set up widget enablement/visibility
+        self.cmdLoad.setVisible(self.edit_only)
+
         # Add tabs
         # Plugin definition widget
         self.plugin_widget = PluginDefinition(self)
@@ -52,17 +56,27 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
         self.setPluginActive(True)
 
         self.editor_widget = ModelEditor(self)
+        # Initially, nothing in the editor
+        self.editor_widget.setEnabled(False)
         self.tabWidget.addTab(self.editor_widget, "Model editor")
-        
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.Apply).setEnabled(False)
+
+        if self.edit_only:
+            self.buttonBox.button(QtWidgets.QDialogButtonBox.Apply).setText("Save")
+            # Hide signals from the plugin widget
+            self.plugin_widget.blockSignals(True)
+            # and hide the tab/widget itself
+            self.tabWidget.removeTab(0)
+
     def addSignals(self):
         """
         Define slots for common widget signals
         """
         # buttons
-        self.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).clicked.connect(self.onOk)
         self.buttonBox.button(QtWidgets.QDialogButtonBox.Apply).clicked.connect(self.onApply)
-        self.buttonBox.button(QtWidgets.QDialogButtonBox.Cancel).clicked.connect(self.reject)
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.Cancel).clicked.connect(self.onCancel)
         self.buttonBox.button(QtWidgets.QDialogButtonBox.Help).clicked.connect(self.onHelp)
+        self.cmdLoad.clicked.connect(self.onLoad)
         # custom signals
         self.sasmodelChangedSignal.connect(self.updateSasModel)
         # signals from tabs
@@ -75,12 +89,65 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
         """
         self.plugin_widget.setEnabled(is_active)
 
-    def onOk(self):
+    def closeEvent(self, event):
         """
-        Accept the model and close the dialog
+        Overwrite the close even to assure intent
         """
-        self.onApply()
-        self.accept()
+        if self.is_modified:
+            ret = self.onModifiedExit()
+            if ret == QtWidgets.QMessageBox.Cancel:
+                return
+            elif ret == QtWidgets.QMessageBox.Save:
+                self.updateFromEditor()
+        event.accept()
+
+    def onLoad(self):
+        """
+        Loads a model plugin file
+        """
+        plugin_location = models.find_plugins_dir()
+        filename = QtWidgets.QFileDialog.getOpenFileName(
+                                        self,
+                                        'Open Plugin',
+                                        plugin_location,
+                                        'SasView Plugin Model (*.py)',
+                                        None,
+                                        QtWidgets.QFileDialog.DontUseNativeDialog)[0]
+
+        # Load the file
+        if not filename:
+            logging.info("No data file chosen.")
+            return
+
+        self.editor_widget.blockSignals(True)
+        with open(filename, 'r') as plugin:
+            self.editor_widget.txtEditor.setPlainText(plugin.read())
+        self.editor_widget.setEnabled(True)
+        self.editor_widget.blockSignals(False)
+        self.filename, _ = os.path.splitext(os.path.basename(filename))
+
+        self.setWindowTitle(self.window_title + " - " + self.filename)
+
+    def onModifiedExit(self):
+        msg_box = QtWidgets.QMessageBox(self)
+        msg_box.setWindowTitle("SasView Model Editor")
+        msg_box.setText("The document has been modified.")
+        msg_box.setInformativeText("Do you want to save your changes?")
+        msg_box.setStandardButtons(QtWidgets.QMessageBox.Save | QtWidgets.QMessageBox.Discard | QtWidgets.QMessageBox.Cancel)
+        msg_box.setDefaultButton(QtWidgets.QMessageBox.Save)
+        return msg_box.exec()
+
+    def onCancel(self):
+        """
+        Accept if document not modified, confirm intent otherwise.
+        """
+        if self.is_modified:
+            ret = self.onModifiedExit()
+            if ret == QtWidgets.QMessageBox.Cancel:
+                return
+            elif ret == QtWidgets.QMessageBox.Save:
+                self.updateFromEditor()
+        self.reject()
 
     def onApply(self):
         """
@@ -91,34 +158,49 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
             self.updateFromPlugin()
         else:
             self.updateFromEditor()
+        self.is_modified = False
 
     def editorModelModified(self):
         """
         User modified the model in the Model Editor.
         Disable the plugin editor and show that the model is changed.
         """
-        #self.setPluginActive(False)
-        self.setTabEdited(1, True)
+        self.setTabEdited(True)
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.Apply).setEnabled(True)
+        self.is_modified = True
 
     def pluginModelModified(self):
         """
         User modified the model in the Plugin Editor.
         Show that the model is changed.
         """
-        self.setTabEdited(0, True)
+        # Ensure plugin name is non-empty
+        model = self.getModel()
+        if model['filename']:
+            self.setWindowTitle(self.window_title + " - " + model['filename'])
+            self.setTabEdited(True)
+            # Enable editor
+            self.editor_widget.setEnabled(True)
+            self.buttonBox.button(QtWidgets.QDialogButtonBox.Apply).setEnabled(True)
+            self.is_modified = True
+        else:
+            self.buttonBox.button(QtWidgets.QDialogButtonBox.Apply).setEnabled(False)
 
-    def setTabEdited(self, index, is_edited):
+    def setTabEdited(self, is_edited):
         """
-        Change the tab name to indicate unsaved state
+        Change the widget name to indicate unsaved state
+        Unsaved state: add "*" to filename display
+        saved state: remove "*" from filename display
         """
-        current_text = self.tabWidget.tabText(index)
+        current_text = self.windowTitle()
+
         if is_edited:
             if current_text[-1] != "*":
                 current_text += "*"
         else:
             if current_text[-1] == "*":
                 current_text = current_text[:-1]
-        self.tabWidget.setTabText(index, current_text)
+        self.setWindowTitle(current_text)
 
     def updateFromPlugin(self):
         """
@@ -160,9 +242,8 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
         self.editor_widget.txtEditor.setPlainText(model_str)
         self.editor_widget.blockSignals(False)
 
-        # Set the tab title
-        self.setTabEdited(0, False)
-        self.setTabEdited(1, False)
+        # Set the widget title
+        self.setTabEdited(False)
 
     def updateFromEditor(self):
         """
@@ -175,7 +256,7 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
         # Save the file
         self.writeFile(self.filename, model_str)
         # Update the tab title
-        self.setTabEdited(1, False)
+        self.setTabEdited(False)
         
     def canWriteModel(self, model=None, full_path=""):
         """
@@ -272,11 +353,11 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
         model_text += 'def Iq(%s):\n' % ', '.join(['x'] + param_names)
         model_text += '    """Absolute scattering"""\n'
         if "scipy." in func_str:
-            model_text +='    import scipy'
+            model_text +="    import scipy\n"
         if "numpy." in func_str:
-            model_text +='    import numpy'
+            model_text +="    import numpy\n"
         if "np." in func_str:
-            model_text +='    import numpy as np'
+            model_text +="    import numpy as np\n"
         for func_line in func_str.split('\n'):
                 model_text +='%s%s\n' % ("    ", func_line)
         model_text +='## uncomment the following if Iq works for vector x\n'
@@ -284,11 +365,11 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
 
         # If polydisperse, create place holders for form_volume, ER and VR
         if pd_params:
-            model_text +='\n'
+            model_text +="\n"
             model_text +=CUSTOM_TEMPLATE_PD % {'args': ', '.join(pd_params)}
 
         # Create place holder for Iqxy
-        model_text +='\n'
+        model_text +="\n"
         model_text +='#def Iqxy(%s):\n' % ', '.join(["x", "y"] + param_names)
         model_text +='#    """Absolute scattering of oriented particles."""\n'
         model_text +='#    ...\n'
@@ -341,6 +422,7 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
         """
         param_str = ""
         for row, params in param_dict.items():
+            if not params[0]: continue
             value = 1
             if params[1]:
                 try:
