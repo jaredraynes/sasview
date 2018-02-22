@@ -54,5 +54,7 @@ class ModelEditor(QtWidgets.QDialog, Ui_ModelEditor):
         """
         Return the current model, as displayed in the window
         """
-        return self.txtEditor.toPlainText()
+        model = {'text':self.txtEditor.toPlainText()}
+        model['filename'] = ""
+        return model
 

@@ -24,7 +24,6 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
     Once the model is defined, it can be saved as a plugin.
     """
     # Signals for intertab communication plugin -> editor
-    sasmodelChangedSignal = QtCore.pyqtSignal()
     def __init__(self, parent=None, edit_only=False):
         super(TabbedModelEditor, self).__init__()
 
@@ -77,8 +76,6 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
         self.buttonBox.button(QtWidgets.QDialogButtonBox.Cancel).clicked.connect(self.onCancel)
         self.buttonBox.button(QtWidgets.QDialogButtonBox.Help).clicked.connect(self.onHelp)
         self.cmdLoad.clicked.connect(self.onLoad)
-        # custom signals
-        self.sasmodelChangedSignal.connect(self.updateSasModel)
         # signals from tabs
         self.editor_widget.modelModified.connect(self.editorModelModified)
         self.plugin_widget.modelModified.connect(self.pluginModelModified)
@@ -176,7 +173,7 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
         """
         # Ensure plugin name is non-empty
         model = self.getModel()
-        if model['filename']:
+        if 'filename' in model and model['filename']:
             self.setWindowTitle(self.window_title + " - " + model['filename'])
             self.setTabEdited(True)
             # Enable editor
@@ -208,6 +205,7 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
         """
         # get current model
         model = self.getModel()
+        if 'filename' not in model: return
 
         # get required filename
         filename = model['filename']
@@ -252,7 +250,7 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
         # make sure we have the file handly ready
         assert(self.filename != "")
         # Retrieve model string
-        model_str = self.editor_widget.txtEditor.toPlainText()
+        model_str = self.getModel()['text']
         # Save the file
         self.writeFile(self.filename, model_str)
         # Update the tab title
@@ -303,14 +301,7 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
         """
         Retrieves plugin model from the currently open tab
         """
-        model = self.tabWidget.currentWidget().getModel()
-        return model
-
-    def updateSasModel(self, model=None):
-        """
-        Respond to sasmodel update in one of the tabs
-        """
-        assert(model)
+        return self.tabWidget.currentWidget().getModel()
 
     def writeFile(self, fname, model_str=""):
         """
