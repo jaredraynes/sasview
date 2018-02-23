@@ -1147,8 +1147,8 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         self.setFittingStopped()
 
         # Show the grid panel
-        grid_window = BatchOutputPanel(parent=self, output_data=result[0])
-        grid_window.show()
+        self.grid_window = BatchOutputPanel(parent=self, output_data=result[0])
+        self.grid_window.show()
 
     def fitComplete(self, result):
         """

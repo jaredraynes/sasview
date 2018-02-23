@@ -1,6 +1,7 @@
 import os
 import time
 import logging
+import webbrowser
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
@@ -61,25 +62,18 @@ class BatchOutputPanel(QtWidgets.QMainWindow, Ui_GridPanelUI):
 
         self.addToolbarActions()
 
-        # Main parameter table
-        model = self.data[0][0]
-        # Only the main parameters
-        param_list = [m for m in model.model.params.keys() if ":" not in m]
-        params = {}
-        for param in param_list:
-            params[param] = model.model.params[param]
-        rows = len(output_data)
-        columns = len(param_list)
-        self.tblParams.setColumnCount(columns+2)
-        self.tblParams.setRowCount(rows)
-        self.setupTable(self.data)
-
         # file name for the dataset
         self.grid_filename = ""
 
         # context menu on the table
         self.tblParams.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.tblParams.customContextMenuRequested.connect(self.showContextMenu)
+
+        # Fill in the table from input data
+        self.setupTable(output_data)
+
+        # Command buttons
+        self.cmdHelp.clicked.connect(self.onHelp)
 
     def addToolbarActions(self):
         """
@@ -132,6 +126,17 @@ class BatchOutputPanel(QtWidgets.QMainWindow, Ui_GridPanelUI):
             logging.error("Error generating context menu: %s" % ex)
         return
 
+    def onHelp(self):
+        """
+        Open a local url in the default browser
+        """
+        location = GuiUtils.HELP_DIRECTORY_LOCATION
+        url = "/user/sasgui/perspectives/fitting/fitting_help.html#batch-fit-mode"
+        try:
+            webbrowser.open('file://' + os.path.realpath(location+url))
+        except webbrowser.Error as ex:
+            logging.warning("Cannot display help. %s" % ex)
+
     def plotFits(self):
         """
         Plot selected fits by sending signal to the parent
@@ -167,7 +172,6 @@ class BatchOutputPanel(QtWidgets.QMainWindow, Ui_GridPanelUI):
         """
         Generates a .csv file and opens the default CSV reader
         """
-        #def open_with_externalapp(self, data, file_name, details=""):
         if not self.grid_filename:
             import tempfile
             tmpfile = tempfile.NamedTemporaryFile(delete=False, mode="w+", suffix=".csv")
@@ -217,7 +221,6 @@ class BatchOutputPanel(QtWidgets.QMainWindow, Ui_GridPanelUI):
         with open(filename, 'w') as csv_file:
             self.writeBatchToFile(data=data, tmpfile=csv_file, details=details)
 
-
     def setupTableFromCSV(self, csv_data):
         """
         Create tablewidget items and show them, based on params
@@ -243,6 +246,14 @@ class BatchOutputPanel(QtWidgets.QMainWindow, Ui_GridPanelUI):
         # headers
         model = data[0][0]
         param_list = [m for m in model.model.params.keys() if ":" not in m]
+
+        # Check if 2D model. If not, remove theta/phi
+
+        rows = len(data)
+        columns = len(param_list)
+        self.tblParams.setColumnCount(columns+2)
+        self.tblParams.setRowCount(rows)
+
         param_list.insert(0, "Data")
         param_list.insert(0, "Chi2")
         for i, param in enumerate(param_list):
@@ -252,7 +263,9 @@ class BatchOutputPanel(QtWidgets.QMainWindow, Ui_GridPanelUI):
         for i_row, row in enumerate(data):
             # each row corresponds to a single fit
             chi2 = row[0].fitness
-            filename = row[0].data.sas_data.filename
+            filename = ""
+            if hasattr(row[0].data, "sas_data"):
+                filename = row[0].data.sas_data.filename
             self.tblParams.setItem(i_row, 0, QtWidgets.QTableWidgetItem(GuiUtils.formatNumber(chi2, high=True)))
             self.tblParams.setItem(i_row, 1, QtWidgets.QTableWidgetItem(str(filename)))
             # Now, all the parameters
