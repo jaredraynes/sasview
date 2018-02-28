@@ -3,6 +3,7 @@
 """
 import time
 import os
+import logging
 
 #from sas.sasgui.guiframe.gui_style import GUIFRAME
 import sas.sasview
@@ -136,6 +137,10 @@ USING_TWISTED = True
 
 # Time out for updating sasview
 UPDATE_TIMEOUT = 2
+
+# Logging levels to disable, if any
+DISABLE_LOGGING = logging.DEBUG
+
 def printEVT(message):
     """
     Post a debug message to console/file

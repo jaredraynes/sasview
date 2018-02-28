@@ -99,6 +99,9 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         # Globals
         self.initializeGlobals()
 
+        # Set up desired logging level
+        logging.disable(LocalConfig.DISABLE_LOGGING)
+
         # Main GUI setup up
         self.setupUi(self)
         self.setWindowTitle("Fitting")
