@@ -14,7 +14,7 @@
 
 # Make sure the option of saving each curve is available
 # Use the I(q) curve as input and compare the output to P(r)
-from __future__ import print_function
+
 
 import sys
 import wx
@@ -32,7 +32,7 @@ from sas.sascalc.pr.invertor import Invertor
 from sas.sascalc.dataloader.loader import Loader
 import sas.sascalc.dataloader
 
-from pr_widgets import load_error
+from .pr_widgets import load_error
 from sas.sasgui.guiframe.plugin_base import PluginBase
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,8 @@ class Plugin(PluginBase):
         self.max_length = self.DEFAULT_DMAX
         self.q_min = None
         self.q_max = None
-        self.has_bck = False
+        self.est_bck = False
+        self.bck_val = 0
         self.slit_height = 0
         self.slit_width = 0
         ## Remember last plottable processed
@@ -105,7 +106,7 @@ class Plugin(PluginBase):
         self.list_plot_id = []
 
         # Associate the inversion state reader with .prv files
-        from inversion_state import Reader
+        from .inversion_state import Reader
 
         # Create a CanSAS/Pr reader
         self.state_reader = Reader(self.set_state)
@@ -149,7 +150,7 @@ class Plugin(PluginBase):
             if data is None:
                 msg = "Pr.set_state: datainfo parameter cannot "
                 msg += "be None in standalone mode"
-                raise RuntimeError, msg
+                raise RuntimeError(msg)
 
             # Ensuring that plots are coordinated correctly
             t = time.localtime(data.meta_data['prstate'].timestamp)
@@ -183,7 +184,7 @@ class Plugin(PluginBase):
                                                    title=self.current_plottable.title))
             self.control_panel.set_state(state)
         except:
-            logger.error("prview.set_state: %s" % sys.exc_value)
+            logger.error("prview.set_state: %s" % sys.exc_info()[1])
 
 
     def help(self, evt):
@@ -193,7 +194,7 @@ class Plugin(PluginBase):
         :TODO: replace the text with a nice image
 
         """
-        from inversion_panel import HelpDialog
+        from .inversion_panel import HelpDialog
         dialog = HelpDialog(None, -1)
         if dialog.ShowModal() == wx.ID_OK:
             dialog.Destroy()
@@ -367,7 +368,7 @@ class Plugin(PluginBase):
         """
         Redisplay P(r) with a different number of points
         """
-        from inversion_panel import PrDistDialog
+        from .inversion_panel import PrDistDialog
         dialog = PrDistDialog(None, -1)
         dialog.set_content(self._pr_npts)
         if dialog.ShowModal() == wx.ID_OK:
@@ -450,7 +451,7 @@ class Plugin(PluginBase):
         dataread = data
         # Notify the user if we could not read the file
         if dataread is None:
-            raise RuntimeError, "Invalid data"
+            raise RuntimeError("Invalid data")
 
         x = None
         y = None
@@ -470,7 +471,7 @@ class Plugin(PluginBase):
             else:
                 if dataread is None:
                     return x, y, err
-                raise RuntimeError, "This tool can only read 1D data"
+                raise RuntimeError("This tool can only read 1D data")
 
         self._current_file_data.x = x
         self._current_file_data.y = y
@@ -510,7 +511,7 @@ class Plugin(PluginBase):
                     data_y = np.append(data_y, y)
                     data_err = np.append(data_err, err)
                 except:
-                    logger.error(sys.exc_value)
+                    logger.error(sys.exc_info()[1])
 
         if scale is not None:
             message = "The loaded file had no error bars, statistical errors are assumed."
@@ -561,7 +562,7 @@ class Plugin(PluginBase):
                         data_y = np.append(data_y, y)
                         data_err = np.append(data_err, err)
                     except:
-                        logger.error(sys.exc_value)
+                        logger.error(sys.exc_info()[1])
                 elif line.find("The 6 columns") >= 0:
                     data_started = True
 
@@ -718,7 +719,7 @@ class Plugin(PluginBase):
         """
             Start a calculation thread
         """
-        from pr_thread import CalcPr
+        from .pr_thread import CalcPr
 
         # If a thread is already started, stop it
         if self.calc_thread is not None and self.calc_thread.isrunning():
@@ -827,6 +828,7 @@ class Plugin(PluginBase):
         self.control_panel.rg = pr.rg(out)
         self.control_panel.iq0 = pr.iq0(out)
         self.control_panel.bck = pr.background
+        self.control_panel.bck_input.SetValue("{:.2g}".format(pr.background))
 
         # Show I(q) fit
         self.show_iq(out, self.pr)
@@ -847,13 +849,13 @@ class Plugin(PluginBase):
             try:
                 pr = self._create_file_pr(data)
             except:
-                status = "Problem reading data: %s" % sys.exc_value
+                status = "Problem reading data: %s" % sys.exc_info()[1]
                 wx.PostEvent(self.parent, StatusEvent(status=status))
-                raise RuntimeError, status
+                raise RuntimeError(status)
 
             # If the file contains nothing, just return
             if pr is None:
-                raise RuntimeError, "Loaded data is invalid"
+                raise RuntimeError("Loaded data is invalid")
 
             self.pr = pr
 
@@ -903,10 +905,10 @@ class Plugin(PluginBase):
         else:
             msg = "pr.save_data: the data being saved is not a"
             msg += " sas.data_info.Data1D object"
-            raise RuntimeError, msg
+            raise RuntimeError(msg)
 
     def setup_plot_inversion(self, alpha, nfunc, d_max, q_min=None, q_max=None,
-                             bck=False, height=0, width=0):
+                             est_bck=False, bck_val=0, height=0, width=0):
         """
             Set up inversion from plotted data
         """
@@ -915,7 +917,8 @@ class Plugin(PluginBase):
         self.max_length = d_max
         self.q_min = q_min
         self.q_max = q_max
-        self.has_bck = bck
+        self.est_bck = est_bck
+        self.bck_val = bck_val
         self.slit_height = height
         self.slit_width = width
 
@@ -925,11 +928,11 @@ class Plugin(PluginBase):
                 self.pr = pr
                 self.perform_inversion()
         except:
-            wx.PostEvent(self.parent, StatusEvent(status=sys.exc_value))
+            wx.PostEvent(self.parent, StatusEvent(status=sys.exc_info()[1]))
 
     def estimate_plot_inversion(self, alpha, nfunc, d_max,
                                 q_min=None, q_max=None,
-                                bck=False, height=0, width=0):
+                                est_bck=False, bck_val=0, height=0, width=0):
         """
             Estimate parameters from plotted data
         """
@@ -938,7 +941,8 @@ class Plugin(PluginBase):
         self.max_length = d_max
         self.q_min = q_min
         self.q_max = q_max
-        self.has_bck = bck
+        self.est_bck = est_bck
+        self.bck_val = bck_val
         self.slit_height = height
         self.slit_width = width
 
@@ -948,7 +952,7 @@ class Plugin(PluginBase):
                 self.pr = pr
                 self.perform_estimate()
         except:
-            wx.PostEvent(self.parent, StatusEvent(status=sys.exc_value))
+            wx.PostEvent(self.parent, StatusEvent(status=sys.exc_info()[1]))
 
     def _create_plot_pr(self, estimate=False):
         """
@@ -972,9 +976,10 @@ class Plugin(PluginBase):
         pr.q_max = self.q_max
         pr.x = self.current_plottable.x
         pr.y = self.current_plottable.y
-        pr.has_bck = self.has_bck
+        pr.est_bck = self.est_bck
         pr.slit_height = self.slit_height
         pr.slit_width = self.slit_width
+        pr.background = self.bck_val
 
         # Keep track of the plot window title to ensure that
         # we can overlay the plots
@@ -1018,7 +1023,7 @@ class Plugin(PluginBase):
         self.max_length = d_max
         self.q_min = q_min
         self.q_max = q_max
-        self.has_bck = bck
+        self.est_bck = bck
         self.slit_height = height
         self.slit_width = width
 
@@ -1028,7 +1033,7 @@ class Plugin(PluginBase):
                 self.pr = pr
                 self.perform_inversion()
         except:
-            wx.PostEvent(self.parent, StatusEvent(status=sys.exc_value))
+            wx.PostEvent(self.parent, StatusEvent(status=sys.exc_info()[1]))
 
     def estimate_file_inversion(self, alpha, nfunc, d_max, data,
                                 path=None, q_min=None, q_max=None,
@@ -1041,7 +1046,7 @@ class Plugin(PluginBase):
         self.max_length = d_max
         self.q_min = q_min
         self.q_max = q_max
-        self.has_bck = bck
+        self.est_bck = bck
         self.slit_height = height
         self.slit_width = width
 
@@ -1051,7 +1056,7 @@ class Plugin(PluginBase):
                 self.pr = pr
                 self.perform_estimate()
         except:
-            wx.PostEvent(self.parent, StatusEvent(status=sys.exc_value))
+            wx.PostEvent(self.parent, StatusEvent(status=sys.exc_info()[1]))
 
     def _create_file_pr(self, data):
         """
@@ -1080,7 +1085,7 @@ class Plugin(PluginBase):
             self._current_file_data.err = data.dy
             x, y, err = data.x, data.y, data.dy
         except:
-            load_error(sys.exc_value)
+            load_error(sys.exc_info()[1])
             return None
 
         # If the file contains no data, just return
@@ -1114,19 +1119,19 @@ class Plugin(PluginBase):
             pr.x = x
             pr.y = y
             pr.err = err
-            pr.has_bck = self.has_bck
+            pr.est_bck = self.est_bck
             pr.slit_height = self.slit_height
             pr.slit_width = self.slit_width
             return pr
         except:
-            load_error(sys.exc_value)
+            load_error(sys.exc_info()[1])
         return None
 
     def perform_estimate(self):
         """
             Perform parameter estimation
         """
-        from pr_thread import EstimatePr
+        from .pr_thread import EstimatePr
 
         # If a thread is already started, stop it
         if self.estimation_thread is not None and \
@@ -1156,7 +1161,7 @@ class Plugin(PluginBase):
         """
             Perform parameter estimation
         """
-        from pr_thread import EstimateNT
+        from .pr_thread import EstimateNT
 
         # If a thread is already started, stop it
         if self.estimation_thread is not None and self.estimation_thread.isrunning():
@@ -1233,7 +1238,7 @@ class Plugin(PluginBase):
         """
             Create and return a list of panel objects
         """
-        from inversion_panel import InversionControl
+        from .inversion_panel import InversionControl
 
         self.parent = parent
         self.frame = MDIFrame(self.parent, None, 'None', (100, 200))
@@ -1281,7 +1286,7 @@ class Plugin(PluginBase):
                 msg = "Prview does not allow multiple data!\n"
                 msg += "Please select one.\n"
                 if len(data_list) > 1:
-                    from pr_widgets import DataDialog
+                    from .pr_widgets import DataDialog
                     dlg = DataDialog(data_list=data_1d_list, text=msg)
                     if dlg.ShowModal() == wx.ID_OK:
                         data = dlg.get_data()
@@ -1301,7 +1306,7 @@ class Plugin(PluginBase):
                     self.data_id = data.id
                     self.control_panel._change_file(evt=None, data=data)
                 except:
-                    msg = "Prview Set_data: " + str(sys.exc_value)
+                    msg = "Prview Set_data: " + str(sys.exc_info()[1])
                     wx.PostEvent(self.parent, StatusEvent(status=msg, info="error"))
             else:
                 msg = "Pr cannot be computed for data of "

@@ -27,7 +27,7 @@ DEFAULT_STATE = {
 
 # List of output parameters, used by __str__
 output_list = [
-    ['max', "Long Period (A): "],
+    ['max', "Long Period / 2 (A): "],
     ['Lc', "Average Hard Block Thickness (A): "],
     ['dtr', "Average Interface Thickness (A): "],
     ['d0', "Average Core Thickness: "],
@@ -58,7 +58,6 @@ class CorfuncState(object):
         # Raw Data
         self.q = None
         self.iq = None
-        # TODO: Add extrapolated data and transformed data (when implemented)
 
     def __str__(self):
         """
@@ -74,7 +73,7 @@ class CorfuncState(object):
 
         if self.outputs != {} and self.outputs is not None:
             state += "\nOutputs:\n"
-            for key, value in self.outputs.iteritems():
+            for key, value in self.outputs.items():
                 name = output_list[key][1]
                 state += "{}: {}\n".format(name, str(value))
 
@@ -158,7 +157,7 @@ class CorfuncState(object):
         # Current state
         state = new_doc.createElement("state")
         top_element.appendChild(state)
-        for name, value in self.saved_state.iteritems():
+        for name, value in self.saved_state.items():
             element = new_doc.createElement(name)
             element.appendChild(new_doc.createTextNode(str(value)))
             state.appendChild(element)
@@ -181,7 +180,7 @@ class CorfuncState(object):
         if self.outputs != {} and self.outputs is not None:
             output = new_doc.createElement("output")
             top_element.appendChild(output)
-            for key, value in self.outputs.iteritems():
+            for key, value in self.outputs.items():
                 element = new_doc.createElement(key)
                 element.appendChild(new_doc.createTextNode(str(value)))
                 output.appendChild(element)
@@ -216,13 +215,13 @@ class CorfuncState(object):
                     self.timestamp = (entry.get('epoch'))
                 except:
                     msg = ("CorfuncState.fromXML: Could not read timestamp",
-                        "\n{}").format(sys.exc_value)
+                        "\n{}").format(sys.exc_info()[1])
                     logger.error(msg)
 
             # Parse current state
             entry = get_content('ns:state', node)
             if entry is not None:
-                for item in DEFAULT_STATE.iterkeys():
+                for item in DEFAULT_STATE.keys():
                     input_field = get_content("ns:{}".format(item), entry)
                     if input_field is not None:
                         try:
@@ -283,23 +282,23 @@ class Reader(CansasReader):
             basename = os.path.basename(path)
             root, ext = os.path.splitext(basename)
             if not ext.lower() in self.ext:
-                raise IOError, "{} is not a supported file type".format(ext)
+                raise IOError("{} is not a supported file type".format(ext))
             tree = etree.parse(path, parser=etree.ETCompatXMLParser())
             root = tree.getroot()
             entry_list = root.xpath('/ns:SASroot/ns:SASentry',
                 namespaces={'ns': CANSAS_NS})
             for entry in entry_list:
-                sas_entry, _ = self._parse_entry(entry)
                 corstate = self._parse_state(entry)
 
                 if corstate is not None:
+                    sas_entry, _ = self._parse_entry(entry)
                     sas_entry.meta_data['corstate'] = corstate
                     sas_entry.filename = corstate.file
                     output.append(sas_entry)
         else:
             # File not found
             msg = "{} is not a valid file path or doesn't exist".format(path)
-            raise IOError, msg
+            raise IOError(msg)
 
         if len(output) == 0:
             return None
@@ -323,7 +322,7 @@ class Reader(CansasReader):
         elif not (isinstance(datainfo, Data1D) or isinstance(datainfo, LoaderData1D)):
             msg = ("The CanSAS writer expects a Data1D instance. {} was "
                 "provided").format(datainfo.__class__.__name__)
-            raise RuntimeError, msg
+            raise RuntimeError(msg)
         if datainfo.title is None or datainfo.title == '':
             datainfo.title = datainfo.name
         if datainfo.run_name is None or datainfo.run_name == '':
@@ -360,6 +359,6 @@ class Reader(CansasReader):
                 state.fromXML(nodes[0])
         except:
             msg = "XML document does not contain CorfuncState information\n{}"
-            msg.format(sys.exc_value)
+            msg.format(sys.exc_info()[1])
             logger.info(msg)
         return state

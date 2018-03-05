@@ -13,6 +13,8 @@ import traceback
 
 from sasmodels.weights import MODELS as POLYDISPERSITY_MODELS
 
+from sas.sascalc.fit.qsmearing import smear_selection
+
 from sas.sasgui.guiframe.events import StatusEvent, NewPlotEvent, \
     PlotQrangeEvent
 from sas.sasgui.guiframe.dataFitting import check_data_validity
@@ -22,7 +24,6 @@ from sas.sasgui.guiframe.documentation_window import DocumentationWindow
 from sas.sasgui.perspectives.fitting.basepage import BasicPage as BasicPage
 from sas.sasgui.perspectives.fitting.basepage import PageInfoEvent as \
     PageInfoEvent
-from sas.sascalc.data_util.qsmearing import smear_selection
 from .basepage import ModelTextCtrl
 
 (Chi2UpdateEvent, EVT_CHI2_UPDATE) = wx.lib.newevent.NewEvent()
@@ -279,7 +280,7 @@ class FitPage(BasicPage):
                         self._on_select_accuracy)
 
         # Fit button
-        self.btFit = wx.Button(self, self._ids.next(), 'Fit')
+        self.btFit = wx.Button(self, next(self._ids), 'Fit')
         self.default_bt_colour = self.btFit.GetDefaultAttributes()
         self.btFit.Bind(wx.EVT_BUTTON, self._onFit, id=self.btFit.GetId())
         self.btFit.SetToolTipString("Start fitting.")
@@ -288,7 +289,7 @@ class FitPage(BasicPage):
         self.btFitHelp = wx.Button(self, wx.ID_ANY, 'Help')
         self.btFitHelp.SetToolTipString("General fitting help.")
         self.btFitHelp.Bind(wx.EVT_BUTTON, self._onFitHelp)
-        
+
         # Resolution Smearing Help button (for now use same technique as
         # used for dI help to get tiniest possible button that works
         # both on MAC and PC.  Should completely rewrite the fitting sizer
@@ -302,7 +303,7 @@ class FitPage(BasicPage):
                                      style=wx.BU_EXACTFIT, size=size_q)
         self.btSmearHelp.SetToolTipString("Resolution smearing help.")
         self.btSmearHelp.Bind(wx.EVT_BUTTON, self._onSmearHelp)
-        
+
         # textcntrl for custom resolution
         self.smear_pinhole_percent = ModelTextCtrl(self, wx.ID_ANY,
                                                    size=(_BOX_WIDTH - 25, 20),
@@ -375,7 +376,7 @@ class FitPage(BasicPage):
             " Total Npts : total number of data points")
 
         # Update and Draw button
-        self.draw_button = wx.Button(self, self._ids.next(), 'Compute')
+        self.draw_button = wx.Button(self, next(self._ids), 'Compute')
         self.draw_button.Bind(wx.EVT_BUTTON,
                               self._onDraw, id=self.draw_button.GetId())
         self.draw_button.SetToolTipString("Compute and Draw.")
@@ -530,7 +531,7 @@ class FitPage(BasicPage):
         self.qmax.Bind(wx.EVT_KEY_DOWN, self.on_key)
         self.qmin.Bind(wx.EVT_TEXT, self.on_qrange_text)
         self.qmax.Bind(wx.EVT_TEXT, self.on_qrange_text)
-        wx_id = self._ids.next()
+        wx_id = next(self._ids)
         self.reset_qrange = wx.Button(self, wx_id, 'Reset')
 
         self.reset_qrange.Bind(wx.EVT_BUTTON, self.on_reset_clicked, id=wx_id)
@@ -538,7 +539,7 @@ class FitPage(BasicPage):
 
         sizer = wx.GridSizer(5, 5, 2, 6)
 
-        self.btEditMask = wx.Button(self, self._ids.next(), 'Editor')
+        self.btEditMask = wx.Button(self, next(self._ids), 'Editor')
         self.btEditMask.Bind(wx.EVT_BUTTON, self._onMask,
                              id=self.btEditMask.GetId())
         self.btEditMask.SetToolTipString("Edit Mask.")
@@ -563,13 +564,13 @@ class FitPage(BasicPage):
         sizer.Add(self.points_sizer, 0, 0)
         sizer.Add(self.draw_button, 0, 0)
         sizer.Add((-1, 5))
-        
+
         sizer.Add(self.tcChi, 0, 0)
         sizer.Add(self.Npts_fit, 0, 0)
         sizer.Add(self.Npts_total, 0, 0)
         sizer.Add(self.btFit, 0, 0)
         sizer.Add(self.btFitHelp, 0, 0)
-        
+
         boxsizer_range.Add(sizer_chi2)
         boxsizer_range.Add(sizer)
         if is_2d_data:
@@ -658,7 +659,7 @@ class FitPage(BasicPage):
         self.text_disp_max.Show(True)
         self.text_disp_min.Show(True)
 
-        for item in self.model.dispersion.keys():
+        for item in list(self.model.dispersion.keys()):
             if not self.magnetic_on:
                 if item in self.model.magnetic_params:
                     continue
@@ -673,7 +674,7 @@ class FitPage(BasicPage):
                     self.model.details[name1] = ["", None, None]
 
                 iy += 1
-                for p in self.model.dispersion[item].keys():
+                for p in list(self.model.dispersion[item].keys()):
 
                     if p == "width":
                         ix = 0
@@ -763,7 +764,7 @@ class FitPage(BasicPage):
                 ix = 8
                 disp_box = wx.ComboBox(self, wx.ID_ANY, size=(65, -1),
                                        style=wx.CB_READONLY, name='%s' % name1)
-                for key, value in POLYDISPERSITY_MODELS.iteritems():
+                for key, value in POLYDISPERSITY_MODELS.items():
                     name_disp = str(key)
                     disp_box.Append(name_disp, value)
                     disp_box.SetStringSelection("gaussian")
@@ -777,7 +778,7 @@ class FitPage(BasicPage):
         self.sizer4_4.Add((20, 20), (iy, ix), (1, 1),
                           wx.LEFT | wx.EXPAND | wx.ADJUST_MINSIZE, 15)
         first_orient = True
-        for item in self.model.dispersion.keys():
+        for item in list(self.model.dispersion.keys()):
             if not self.magnetic_on:
                 if item in self.model.magnetic_params:
                     continue
@@ -793,7 +794,7 @@ class FitPage(BasicPage):
                     self.model.details[name1] = ["", None, None]
 
                 iy += 1
-                for p in self.model.dispersion[item].keys():
+                for p in list(self.model.dispersion[item].keys()):
 
                     if p == "width":
                         ix = 0
@@ -927,7 +928,7 @@ class FitPage(BasicPage):
                 ix = 8
                 disp_box = wx.ComboBox(self, wx.ID_ANY, size=(65, -1),
                                 style=wx.CB_READONLY, name='%s' % name1)
-                for key, value in POLYDISPERSITY_MODELS.iteritems():
+                for key, value in POLYDISPERSITY_MODELS.items():
                     name_disp = str(key)
                     disp_box.Append(name_disp, value)
                     disp_box.SetStringSelection("gaussian")
@@ -1077,7 +1078,7 @@ class FitPage(BasicPage):
         :param evt: Triggers on clicking the help button
         """
 
-        _TreeLocation = "user/sasgui/perspectives/fitting/sm_help.html"
+        _TreeLocation = "user/sasgui/perspectives/fitting/resolution.html"
         _doc_viewer = DocumentationWindow(self, wx.ID_ANY, _TreeLocation, "",
                                           "Instrumental Resolution Smearing \
                                           Help")
@@ -1141,22 +1142,35 @@ class FitPage(BasicPage):
         if self.model is not None:
             self.model.name = "M" + str(self.index_model)
 
-    def _on_select_model(self, event=None):
+    def _on_select_model(self, event=None, keep_pars=False):
         """
         call back for model selection
         """
         self.Show(False)
-        copy_flag = False
-        is_poly_enabled = None
         if event is not None:
-            if (event.GetEventObject() == self.formfactorbox
-                    and self.structurebox.GetLabel() != 'None')\
-                    or event.GetEventObject() == self.structurebox\
-                    or event.GetEventObject() == self.multifactorbox:
-                copy_flag = self.get_copy_params()
-                is_poly_enabled = self.enable_disp.GetValue()
+            control = event.GetEventObject()
+            if ((control == self.formfactorbox
+                 and self.structurebox.GetLabel() != 'None')
+                    or control == self.structurebox
+                    or control == self.multifactorbox):
+                keep_pars = True
 
-        self._on_select_model_helper()
+        if keep_pars:
+            saved_pars = self.get_copy_params()
+            is_poly_enabled = self.enable_disp.GetValue()
+        else:
+            saved_pars = None
+            is_poly_enabled = None
+
+        try:
+            self._on_select_model_helper()
+        except Exception as e:
+            evt = StatusEvent(status=e.message, info="error")
+            wx.PostEvent(self._manager.parent, evt)
+            # Set S(Q) to None
+            self.structurebox.SetSelection(0)
+            self._on_select_model()
+            return
         self.set_model_param_sizer(self.model)
         if self.model is None:
             self._set_bookmark_flag(False)
@@ -1169,7 +1183,7 @@ class FitPage(BasicPage):
         # Note: if we fix this, then remove ID_DISPERSER_HELP from basepage
         try:
             self.set_dispers_sizer()
-        except:
+        except Exception:
             pass
         self.state.enable_disp = self.enable_disp.GetValue()
         self.state.disable_disp = self.disable_disp.GetValue()
@@ -1230,33 +1244,37 @@ class FitPage(BasicPage):
             self.state.model = self.model.clone()
             self.state.model.name = self.model.name
 
+        # when select a model only from guictr/button
+        if is_poly_enabled is not None:
+            self.enable_disp.SetValue(is_poly_enabled)
+            self.disable_disp.SetValue(not is_poly_enabled)
+            self._set_dipers_Param(event=None)
+            self.state.enable_disp = self.enable_disp.GetValue()
+            self.state.disable_disp = self.disable_disp.GetValue()
+
+        # Keep the previous param values
+        if saved_pars:
+            self.get_paste_params(saved_pars)
+
         if event is not None:
+            # update list of plugins if new plugin is available
+            # mod_cat = self.categorybox.GetStringSelection()
+            # if mod_cat == CUSTOM_MODEL:
+            #     temp = self.parent.update_model_list()
+            #     for v in self.parent.model_dictionary.values():
+            #         if v.id == self.model.id:
+            #             self.model = v()
+            #             break
+            #     if temp:
+            #         self.model_list_box = temp
+            #         current_val = self.formfactorbox.GetLabel()
+            #         pos = self.formfactorbox.GetSelection()
+            #         self._show_combox_helper()
+            #         self.formfactorbox.SetStringSelection(current_val)
+            #         self.formfactorbox.SetValue(current_val)
             # post state to fit panel
             new_event = PageInfoEvent(page=self)
             wx.PostEvent(self.parent, new_event)
-            # update list of plugins if new plugin is available
-            custom_model = CUSTOM_MODEL
-            mod_cat = self.categorybox.GetStringSelection()
-            if mod_cat == custom_model:
-                temp = self.parent.update_model_list()
-                if temp:
-                    self.model_list_box = temp
-                    current_val = self.formfactorbox.GetLabel()
-                    pos = self.formfactorbox.GetSelection()
-                    self._show_combox_helper()
-                    self.formfactorbox.SetSelection(pos)
-                    self.formfactorbox.SetValue(current_val)
-            # when select a model only from guictr/button
-            if is_poly_enabled is not None:
-                self.enable_disp.SetValue(is_poly_enabled)
-                self.disable_disp.SetValue(not is_poly_enabled)
-                self._set_dipers_Param(event=None)
-                self.state.enable_disp = self.enable_disp.GetValue()
-                self.state.disable_disp = self.disable_disp.GetValue()
-
-            # Keep the previous param values
-            if copy_flag:
-                self.get_paste_params(copy_flag)
             wx.CallAfter(self._onDraw, None)
 
         else:
@@ -1351,7 +1369,7 @@ class FitPage(BasicPage):
                 self._check_value_enter(self.parameters)
             except:
                 tcrtl.SetBackgroundColour("pink")
-                msg = "Model Error:wrong value entered : %s" % sys.exc_value
+                msg = "Model Error:wrong value entered : %s" % sys.exc_info()[1]
                 wx.PostEvent(self._manager.parent, StatusEvent(status=msg))
                 return
         else:
@@ -1463,12 +1481,12 @@ class FitPage(BasicPage):
                         self.qmax_x = tempmax
                 else:
                     tcrtl.SetBackgroundColour("pink")
-                    msg = "Model Error:wrong value entered : %s" % sys.exc_value
+                    msg = "Model Error:wrong value entered : %s" % sys.exc_info()[1]
                     wx.PostEvent(self._manager.parent, StatusEvent(status=msg))
                     return
             except:
                 tcrtl.SetBackgroundColour("pink")
-                msg = "Model Error:wrong value entered : %s" % sys.exc_value
+                msg = "Model Error:wrong value entered : %s" % sys.exc_info()[1]
                 wx.PostEvent(self._manager.parent, StatusEvent(status=msg))
                 return
             # Check if # of points for theory model are valid(>0).
@@ -1714,8 +1732,8 @@ class FitPage(BasicPage):
         # build function (combo)box
         ind = 0
         while(ind < len(list)):
-            for key, val in list.iteritems():
-                if (val == ind):
+            for key, val in list(list.items()):
+                if val == ind:
                     fun_box.Append(key, val)
                     break
             ind += 1
@@ -1846,7 +1864,7 @@ class FitPage(BasicPage):
                                 data.filename
                     wx.PostEvent(self._manager.parent, StatusEvent(status=msg,
                                                info="error"))
-                    raise ValueError, msg
+                    raise ValueError(msg)
 
             else:
                 qmin = 0
@@ -1858,7 +1876,7 @@ class FitPage(BasicPage):
                                 data.filename
                     wx.PostEvent(self._manager.parent, StatusEvent(status=msg,
                                                info="error"))
-                    raise ValueError, msg
+                    raise ValueError(msg)
                 # Maximum value of data
                 qmax = math.sqrt(x * x + y * y)
                 npts = len(data.data)
@@ -2030,6 +2048,8 @@ class FitPage(BasicPage):
             self.select_param()
             # Save state_fit
             self.save_current_state_fit()
+            self.onSmear(None)
+            self._onDraw(None)
         except:
             self._show_combox_helper()
             msg = "Error: This model state has missing or outdated "
@@ -2097,7 +2117,7 @@ class FitPage(BasicPage):
         # make sure stop button to fit button all the time
         self._on_fit_complete()
         if out is None or not np.isfinite(chisqr):
-            raise ValueError, "Fit error occured..."
+            raise ValueError("Fit error occured...")
 
         is_modified = False
         has_error = False
@@ -2172,7 +2192,7 @@ class FitPage(BasicPage):
                             has_error = True
                 i += 1
             else:
-                raise ValueError, "onsetValues: Invalid parameters..."
+                raise ValueError("onsetValues: Invalid parameters...")
         # Show error title when any errors displayed
         if has_error:
             if not self.text2_3.IsShown():
@@ -2180,6 +2200,9 @@ class FitPage(BasicPage):
         # save current state
         self.save_current_state()
 
+        if not self.is_mac:
+            self.Layout()
+            self.Refresh()
         # plot model ( when drawing, do not update chisqr value again)
         self._draw_model(update_chisqr=False, source='fit')
 
@@ -2774,7 +2797,7 @@ class FitPage(BasicPage):
             # no numbers
             else:
                 return cmp(a.lower(), b.lower())
-        
+
         # keys obtained now from ordered dict, so commenting alphabetical
         # ordering keys.sort(custom_compare)
 
@@ -2927,8 +2950,8 @@ class FitPage(BasicPage):
                   wx.LEFT | wx.EXPAND | wx.ADJUST_MINSIZE, 15)
 
         # type can be either Guassian or Array
-        if len(self.model.dispersion.values()) > 0:
-            type = self.model.dispersion.values()[0]["type"]
+        if len(list(self.model.dispersion.values())) > 0:
+            type = list(self.model.dispersion.values())[0]["type"]
         else:
             type = "Gaussian"
 

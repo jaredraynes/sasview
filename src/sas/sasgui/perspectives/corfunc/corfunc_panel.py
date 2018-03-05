@@ -16,10 +16,10 @@ from sas.sasgui.perspectives.corfunc.corfunc_state import CorfuncState
 import sas.sasgui.perspectives.corfunc.corfunc
 from sas.sascalc.corfunc.corfunc_calculator import CorfuncCalculator
 from sas.sasgui.guiframe.documentation_window import DocumentationWindow
-from plot_labels import *
+from .plot_labels import *
 
 OUTPUT_STRINGS = {
-    'max': "Long Period (A): ",
+    'max': "Long Period / 2 (A): ",
     'Lc': "Average Hard Block Thickness (A): ",
     'dtr': "Average Interface Thickness (A): ",
     'd0': "Average Core Thickness: ",
@@ -54,6 +54,9 @@ class CorfuncPanel(ScrolledPanel,PanelBase):
         # The data with no correction for background values
         self._data = data # The data to be analysed (corrected fr background)
         self._extrapolated_data = None # The extrapolated data set
+        # Callable object of class CorfuncCalculator._Interpolator representing
+        # the extrapolated and interpolated data
+        self._extrapolated_fn = None
         self._transformed_data = None # Fourier trans. of the extrapolated data
         self._calculator = CorfuncCalculator()
         self._data_name_box = None # Text box to show name of file
@@ -217,7 +220,8 @@ class CorfuncPanel(ScrolledPanel,PanelBase):
         self._calculator.background = self.background
 
         try:
-            params, self._extrapolated_data = self._calculator.compute_extrapolation()
+            params, self._extrapolated_data, self._extrapolated_fn = \
+                self._calculator.compute_extrapolation()
         except Exception as e:
             msg = "Error extrapolating data:\n"
             msg += str(e)
@@ -256,12 +260,12 @@ class CorfuncPanel(ScrolledPanel,PanelBase):
         wx.PostEvent(self._manager.parent,
             StatusEvent(status=msg))
 
-    def transform_complete(self, transform=None):
+    def transform_complete(self, transforms=None):
         """
         Called from FourierThread when calculation has completed
         """
         self._transform_btn.SetLabel("Transform")
-        if transform is None:
+        if transforms is None:
             msg = "Error calculating Transform."
             if self.transform_type == 'hilbert':
                 msg = "Not yet implemented"
@@ -269,11 +273,19 @@ class CorfuncPanel(ScrolledPanel,PanelBase):
                 StatusEvent(status=msg, info="Error"))
             self._extract_btn.Disable()
             return
-        self._transformed_data = transform
-        import numpy as np
-        plot_x = transform.x[np.where(transform.x <= 200)]
-        plot_y = transform.y[np.where(transform.x <= 200)]
+
+        self._transformed_data = transforms
+        (transform1, transform3, idf) = transforms
+        plot_x = transform1.x[transform1.x <= 200]
+        plot_y = transform1.y[transform1.x <= 200]
         self._manager.show_data(Data1D(plot_x, plot_y), TRANSFORM_LABEL1)
+        # No need to shorten gamma3 as it's only calculated up to x=200
+        self._manager.show_data(transform3, TRANSFORM_LABEL3)
+
+        plot_x = idf.x[idf.x <= 200]
+        plot_y = idf.y[idf.x <= 200]
+        self._manager.show_data(Data1D(plot_x, plot_y), IDF_LABEL)
+
         # Only enable extract params button if a fourier trans. has been done
         if self.transform_type == 'fourier':
             self._extract_btn.Enable()
@@ -285,7 +297,7 @@ class CorfuncPanel(ScrolledPanel,PanelBase):
         Called when "Extract Parameters" is clicked
         """
         try:
-            params = self._calculator.extract_parameters(self._transformed_data)
+            params = self._calculator.extract_parameters(self._transformed_data[0])
         except:
             params = None
         if params is None:
@@ -380,10 +392,10 @@ class CorfuncPanel(ScrolledPanel,PanelBase):
         """
         if params is None:
             # Reset outputs
-            for output in self._extrapolation_outputs.values():
+            for output in list(self._extrapolation_outputs.values()):
                 output.SetValue('-')
             return
-        for key, value in params.iteritems():
+        for key, value in params.items():
             output = self._extrapolation_outputs[key]
             rounded = self._round_sig_figs(value, 6)
             output.SetValue(rounded)
@@ -398,13 +410,13 @@ class CorfuncPanel(ScrolledPanel,PanelBase):
         error = False
         if params is None:
             if not reset: error = True
-            for output in self._output_boxes.values():
+            for output in list(self._output_boxes.values()):
                 output.SetValue('-')
         else:
             if len(params) < len(OUTPUT_STRINGS):
                 # Not all parameters were calculated
                 error = True
-            for key, value in params.iteritems():
+            for key, value in params.items():
                 rounded = self._round_sig_figs(value, 6)
                 self._output_boxes[key].SetValue(rounded)
         if error:
@@ -643,7 +655,7 @@ class CorfuncPanel(ScrolledPanel,PanelBase):
         params_sizer.Add(k_output, (1, 3), (1, 1), wx.RIGHT | wx.EXPAND, 15)
         self._extrapolation_outputs['K'] = k_output
 
-        sigma_label = wx.StaticText(self, -1, u'\u03C3: ')
+        sigma_label = wx.StaticText(self, -1, '\u03C3: ')
         params_sizer.Add(sigma_label, (2, 2), (1, 1), wx.LEFT | wx.EXPAND, 15)
 
         sigma_output = OutputTextCtrl(self, wx.NewId(),
@@ -700,7 +712,7 @@ class CorfuncPanel(ScrolledPanel,PanelBase):
 
         self._output_boxes = dict()
         i = 0
-        for key, value in OUTPUT_STRINGS.iteritems():
+        for key, value in OUTPUT_STRINGS.items():
             # Create a label and a text box for each poperty
             label = wx.StaticText(self, -1, value)
             output_box = OutputTextCtrl(self, wx.NewId(),

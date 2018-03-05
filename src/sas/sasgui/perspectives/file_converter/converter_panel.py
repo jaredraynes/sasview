@@ -23,6 +23,7 @@ from sas.sasgui.guiframe.utils import check_float
 from sas.sascalc.file_converter.cansas_writer import CansasWriter
 from sas.sascalc.file_converter.otoko_loader import OTOKOLoader
 from sas.sascalc.file_converter.bsl_loader import BSLLoader
+from sas.sascalc.file_converter.ascii2d_loader import ASCII2DLoader
 from sas.sascalc.file_converter.nxcansas_writer import NXcanSASWriter
 from sas.sascalc.dataloader.data_info import Detector
 from sas.sascalc.dataloader.data_info import Sample
@@ -34,13 +35,13 @@ if sys.platform.count("win32") > 0:
     PANEL_TOP = 0
     _STATICBOX_WIDTH = 410
     _BOX_WIDTH = 200
-    PANEL_SIZE = 480
+    PANEL_SIZE = 520
     FONT_VARIANT = 0
 else:
     PANEL_TOP = 60
     _STATICBOX_WIDTH = 430
     _BOX_WIDTH = 200
-    PANEL_SIZE = 500
+    PANEL_SIZE = 540
     FONT_VARIANT = 1
 
 class ConverterPanel(ScrolledPanel, PanelBase):
@@ -91,11 +92,12 @@ class ConverterPanel(ScrolledPanel, PanelBase):
         <SasData> elements, or to multiple CanSAS files, each with one
         <SasData> element.
 
-        :param frame_data: If single_file is true, an array of Data1D objects.
-        If single_file is false, a dictionary of the form frame_number: Data1D.
+        :param frame_data: If single_file is true, an array of Data1D
+            objects. If single_file is false, a dictionary of the
+            form *{frame_number: Data1D}*.
         :param filepath: Where to save the CanSAS file
-        :param single_file: If true, array is saved as a single file, if false,
-        each item in the array is saved to it's own file
+        :param single_file: If true, array is saved as a single file,
+            if false, each item in the array is saved to it's own file
         """
         writer = CansasWriter()
         entry_attrs = None
@@ -109,7 +111,7 @@ class ConverterPanel(ScrolledPanel, PanelBase):
             # Folder and base filename
             [group_path, group_name] = os.path.split(filepath)
             ext = "." + group_name.split('.')[-1] # File extension
-            for frame_number, frame_data in frame_data.iteritems():
+            for frame_number, frame_data in frame_data.items():
                 # Append frame number to base filename
                 filename = group_name.replace(ext, str(frame_number)+ext)
                 destination = os.path.join(group_path, filename)
@@ -152,7 +154,7 @@ class ConverterPanel(ScrolledPanel, PanelBase):
             end_char = data[0][-1]
             # If lines end with comma or semi-colon, trim the last character
             if end_char == ',' or end_char == ';':
-                data = map(lambda s: s[0:-1], data)
+                data = [s[0:-1] for s in data]
             else:
                 msg = ("Error reading {}: Lines must end with a digit, comma "
                     "or semi-colon").format(filename.split('\\')[-1])
@@ -190,8 +192,7 @@ class ConverterPanel(ScrolledPanel, PanelBase):
         :param filename: The header file to extract the data from
         :return x_data: A 1D array containing all the x coordinates of the data
         :return y_data: A 1D array containing all the y coordinates of the data
-        :return frame_data: A dictionary of the form frame_number: data, where
-        data is a 2D numpy array containing the intensity data
+        :return frame_data: A dictionary of the form *{frame_number: data}*, where data is a 2D numpy array containing the intensity data
         """
         loader = BSLLoader(filename)
         frames = [0]
@@ -273,7 +274,7 @@ class ConverterPanel(ScrolledPanel, PanelBase):
                         StatusEvent(status=msg))
             else:
                 return { 'frames': [], 'inc': None, 'file': single_file }
-        frames = range(first_frame, last_frame + 1, increment)
+        frames = list(range(first_frame, last_frame + 1, increment))
         return { 'frames': frames, 'inc': increment, 'file': single_file }
 
     def get_metadata(self):
@@ -333,15 +334,15 @@ class ConverterPanel(ScrolledPanel, PanelBase):
             frame_data[i] = data
         if single_file:
             # Only need to set metadata on first Data1D object
-            frame_data = frame_data.values() # Don't need to know frame numbers
+            frame_data = list(frame_data.values()) # Don't need to know frame numbers
             frame_data[0].filename = output_path.split('\\')[-1]
-            for key, value in metadata.iteritems():
+            for key, value in metadata.items():
                 setattr(frame_data[0], key, value)
         else:
             # Need to set metadata for all Data1D objects
-            for datainfo in frame_data.values():
+            for datainfo in list(frame_data.values()):
                 datainfo.filename = output_path.split('\\')[-1]
-                for key, value in metadata.iteritems():
+                for key, value in metadata.items():
                     setattr(datainfo, key, value)
 
         _, ext = os.path.splitext(output_path)
@@ -350,6 +351,14 @@ class ConverterPanel(ScrolledPanel, PanelBase):
         else: # ext == '.h5'
             w = NXcanSASWriter()
             w.write(frame_data, output_path)
+
+    def convert_2d_data(self, dataset):
+        metadata = self.get_metadata()
+        for key, value in metadata.items():
+            setattr(dataset[0], key, value)
+
+        w = NXcanSASWriter()
+        w.write(dataset, self.output.GetPath())
 
     def on_convert(self, event):
         """Called when the Convert button is clicked"""
@@ -366,18 +375,18 @@ class ConverterPanel(ScrolledPanel, PanelBase):
             elif self.data_type == 'otoko':
                 qdata, iqdata = self.extract_otoko_data(self.q_input.GetPath())
                 self.convert_1d_data(qdata, iqdata)
+            elif self.data_type == 'ascii2d':
+                loader = ASCII2DLoader(self.iq_input.GetPath())
+                data = loader.load()
+                dataset = [data] # ASCII 2D only ever contains 1 frame
+                self.convert_2d_data(dataset)
             else: # self.data_type == 'bsl'
                 dataset = self.extract_bsl_data(self.iq_input.GetPath())
                 if dataset is None:
                     # Cancelled by user
                     return
+                self.convert_2d_data(dataset)
 
-                metadata = self.get_metadata()
-                for key, value in metadata.iteritems():
-                    setattr(dataset[0], key, value)
-
-                w = NXcanSASWriter()
-                w.write(dataset, self.output.GetPath())
         except Exception as ex:
             msg = str(ex)
             wx.PostEvent(self.parent.manager.parent,
@@ -398,7 +407,8 @@ class ConverterPanel(ScrolledPanel, PanelBase):
 
     def validate_inputs(self):
         msg = "You must select a"
-        if self.q_input.GetPath() == '' and self.data_type != 'bsl':
+        if self.q_input.GetPath() == '' and self.data_type != 'bsl' \
+            and self.data_type != 'ascii2d':
             msg += " Q Axis input file."
         elif self.iq_input.GetPath() == '':
             msg += "n Intensity input file."
@@ -471,7 +481,7 @@ class ConverterPanel(ScrolledPanel, PanelBase):
         event.Skip()
         dtype = event.GetEventObject().GetName()
         self.data_type = dtype
-        if dtype == 'bsl':
+        if dtype == 'bsl' or dtype == 'ascii2d':
             self.q_input.SetPath("")
             self.q_input.Disable()
             self.output.SetWildcard("NXcanSAS HDF5 File (*.h5)|*.h5")
@@ -499,13 +509,15 @@ class ConverterPanel(ScrolledPanel, PanelBase):
         vbox = wx.BoxSizer(wx.VERTICAL)
 
         instructions = (
-        "Select linked single column 1D ASCII files containing the Q-axis and "
-        "Intensity-axis data, or 1D BSL/OTOKO files, or a 2D BSL/OTOKO file, "
-        "then choose where to save the converted file, and click Convert.\n"
-        "1D ASCII and BSL/OTOKO files can be converted to CanSAS (XML) or "
-        "NXcanSAS (HDF5) formats. 2D BSL/OTOKO files can only be converted to "
-        "the NXcanSAS format.\n"
-        "Metadata can be optionally added for the CanSAS XML format."
+        "If converting a 1D dataset, select linked single-column ASCII files "
+        "containing the Q-axis and intensity-axis data, or a 1D BSL/OTOKO file."
+        " If converting 2D data, select an ASCII file in the ISIS 2D file "
+        "format, or a 2D BSL/OTOKO file. Choose where to save the converted "
+        "file and click convert.\n"
+        "One dimensional ASCII and BSL/OTOKO files can be converted to CanSAS "
+        "(XML) or NXcanSAS (HDF5) formats. Two dimensional datasets can only be"
+        " converted to the NXcanSAS format.\n"
+        "Metadata can also be optionally added to the output file."
         )
 
         instruction_label = wx.StaticText(self, -1, instructions,
@@ -525,17 +537,20 @@ class ConverterPanel(ScrolledPanel, PanelBase):
         input_grid.Add(data_type_label, (y,0), (1,1),
             wx.ALIGN_CENTER_VERTICAL, 5)
         radio_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        ascii_btn = wx.RadioButton(self, -1, "ASCII", name="ascii",
+        ascii_btn = wx.RadioButton(self, -1, "ASCII 1D", name="ascii",
             style=wx.RB_GROUP)
         ascii_btn.Bind(wx.EVT_RADIOBUTTON, self.datatype_changed)
         radio_sizer.Add(ascii_btn)
+        ascii2d_btn = wx.RadioButton(self, -1, "ASCII 2D", name="ascii2d")
+        ascii2d_btn.Bind(wx.EVT_RADIOBUTTON, self.datatype_changed)
+        radio_sizer.Add(ascii2d_btn)
         otoko_btn = wx.RadioButton(self, -1, "BSL 1D", name="otoko")
         otoko_btn.Bind(wx.EVT_RADIOBUTTON, self.datatype_changed)
         radio_sizer.Add(otoko_btn)
-        input_grid.Add(radio_sizer, (y,1), (1,1), wx.ALL, 5)
         bsl_btn = wx.RadioButton(self, -1, "BSL 2D", name="bsl")
         bsl_btn.Bind(wx.EVT_RADIOBUTTON, self.datatype_changed)
         radio_sizer.Add(bsl_btn)
+        input_grid.Add(radio_sizer, (y,1), (1,1), wx.ALL, 5)
         y += 1
 
         q_label = wx.StaticText(self, -1, "Q-Axis Data: ")
@@ -548,7 +563,7 @@ class ConverterPanel(ScrolledPanel, PanelBase):
         input_grid.Add(self.q_input, (y,1), (1,1), wx.ALL, 5)
         y += 1
 
-        iq_label = wx.StaticText(self, -1, "Intensity-Axis Data: ")
+        iq_label = wx.StaticText(self, -1, "Intensity Data: ")
         input_grid.Add(iq_label, (y,0), (1,1), wx.ALIGN_CENTER_VERTICAL, 5)
 
         self.iq_input = wx.FilePickerCtrl(self, -1,
@@ -646,7 +661,7 @@ class ConverterWindow(widget.CHILD_FRAME):
     """Displays ConverterPanel"""
 
     def __init__(self, parent=None, title='File Converter', base=None,
-        manager=None, size=(PANEL_SIZE * 1.05, PANEL_SIZE / 1.1),
+        manager=None, size=(PANEL_SIZE * 0.96, PANEL_SIZE * 0.9),
         *args, **kwargs):
         kwargs['title'] = title
         kwargs['size'] = size

@@ -10,7 +10,7 @@ def map_getattr(classInstance, classFunc, *args):
     return  getattr(classInstance, classFunc)(*args)
 
 def map_apply(arguments):
-    return apply(arguments[0], arguments[1:])
+    return arguments[0](*arguments[1:])
 
 class FitThread(CalcThread):
     """Thread performing the fit """
@@ -27,11 +27,7 @@ class FitThread(CalcThread):
                  yieldtime=0.03,
                  worktime=0.03,
                  reset_flag=False):
-        CalcThread.__init__(self,
-                 completefn,
-                 updatefn,
-                 yieldtime,
-                 worktime)
+        CalcThread.__init__(self, completefn, updatefn, yieldtime, worktime)
         self.handler = handler
         self.fitter = fn
         self.pars = pars
@@ -52,7 +48,7 @@ class FitThread(CalcThread):
             CalcThread.isquit(self)
         except KeyboardInterrupt:
             msg = "Fitting: terminated by the user."
-            raise KeyboardInterrupt, msg
+            raise KeyboardInterrupt(msg)
 
     def compute(self):
         """
@@ -75,10 +71,10 @@ class FitThread(CalcThread):
                 list_fit_function.append('fit')
                 list_map_get_attr.append(map_getattr)
             #from multiprocessing import Pool
-            inputs = zip(list_map_get_attr, self.fitter, list_fit_function,
+            inputs = list(zip(list_map_get_attr, self.fitter, list_fit_function,
                          list_q, list_q, list_handler, list_curr_thread,
-                         list_reset_flag)
-            result = map(map_apply, inputs)
+                         list_reset_flag))
+            result = list(map(map_apply, inputs))
 
             self.complete(result=result,
                           batch_inputs=self.batch_inputs,
@@ -87,18 +83,18 @@ class FitThread(CalcThread):
                           pars=self.pars,
                           elapsed=time.time() - self.starttime)
 
-        except KeyboardInterrupt, msg:
+        except KeyboardInterrupt as msg:
             # Thread was interrupted, just proceed and re-raise.
             # Real code should not print, but this is an example...
             #print "keyboard exception"
-            #Stop on exception during fitting. Todo: need to put 
+            #Stop on exception during fitting. Todo: need to put
             #some mssg and reset progress bar.
 
             # Shouldn't this be re-raising? ConsoleUpdate doesn't act on it.
             # raise KeyboardInterrupt
             if self.handler is not None:
                 self.handler.stop(msg=msg)
-        except:
+        except:  # catch-all: show every exception which stops the thread
             import traceback
             if self.handler is not None:
                 self.handler.error(msg=traceback.format_exc())

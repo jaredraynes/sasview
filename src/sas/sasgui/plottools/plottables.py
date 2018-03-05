@@ -238,15 +238,18 @@ class Graph(object):
 
     def replace(self, plottable):
         """Replace an existing plottable from the graph"""
-        selected_color = None
+        # If the user has set a custom color, ensure the new plot is the same color
+        selected_color = plottable.custom_color
         selected_plottable = None
-        for p in self.plottables.keys():
+        for p in list(self.plottables.keys()):
             if plottable.id == p.id:
                 selected_plottable = p
-                selected_color = self.plottables[p]
+                if selected_color is None:
+                    selected_color = self.plottables[p]
                 break
-        if  selected_plottable is not None and selected_color is not None:
+        if selected_plottable is not None and selected_color is not None:
             del self.plottables[selected_plottable]
+            plottable.custom_color = selected_color
             self.plottables[plottable] = selected_color
 
     def delete(self, plottable):
@@ -385,7 +388,7 @@ class Transform(object):
         user, along with an indication of which plottable was at fault.
 
         """
-        raise NotImplemented, "Not a valid transform"
+        raise NotImplemented("Not a valid transform")
 
     # Related issues
     # ==============
@@ -513,7 +516,7 @@ class Plottable(object):
             if n == 1:
                 label_dict[collection[0]] = basename
             else:
-                for i in xrange(len(collection)):
+                for i in range(len(collection)):
                     label_dict[collection[i]] = "%s %d" % (basename, i)
         return label_dict
 
@@ -685,17 +688,17 @@ class View(object):
             if dx is not None and not len(dx) == 0 and not len(x) == len(dx):
                 msg = "Plottable.View: Given x and dx are not"
                 msg += " of the same length"
-                raise ValueError, msg
+                raise ValueError(msg)
             # Check length of y array
             if not len(y) == len(x):
                 msg = "Plottable.View: Given y "
                 msg += "and x are not of the same length"
-                raise ValueError, msg
+                raise ValueError(msg)
 
             if dy is not None and not len(dy) == 0 and not len(y) == len(dy):
                 msg = "Plottable.View: Given y and dy are not of the same "
                 msg += "length: len(y)=%s, len(dy)=%s" % (len(y), len(dy))
-                raise ValueError, msg
+                raise ValueError(msg)
             self.x = []
             self.y = []
             if has_err_x:
@@ -730,15 +733,15 @@ class View(object):
             if not len(self.x) == len(self.y):
                 msg = "Plottable.View: transformed x "
                 msg += "and y are not of the same length"
-                raise ValueError, msg
+                raise ValueError(msg)
             if has_err_x and not (len(self.x) == len(self.dx)):
                 msg = "Plottable.View: transformed x and dx"
                 msg += " are not of the same length"
-                raise ValueError, msg
+                raise ValueError(msg)
             if has_err_y and not (len(self.y) == len(self.dy)):
                 msg = "Plottable.View: transformed y"
                 msg += " and dy are not of the same length"
-                raise ValueError, msg
+                raise ValueError(msg)
             # Check that negative values are not plot on x and y axis for
             # log10 transformation
             self.check_data_logX()
@@ -810,7 +813,7 @@ class View(object):
                         tempdy.append(self.dy[i])
                 except:
                     logger.error("check_data_logX: skipping point x %g", self.x[i])
-                    logger.error(sys.exc_value)
+                    logger.error(sys.exc_info()[1])
             self.x = tempx
             self.y = tempy
             self.dx = tempdx
@@ -840,7 +843,7 @@ class View(object):
                         tempdy.append(self.dy[i])
                 except:
                     logger.error("check_data_logY: skipping point %g", self.y[i])
-                    logger.error(sys.exc_value)
+                    logger.error(sys.exc_info()[1])
 
             self.x = tempx
             self.y = tempy
@@ -1104,7 +1107,7 @@ class Theory1D(Plottable):
         """
         Plottable.__init__(self)
         msg = "Theory1D is no longer supported, please use Data1D and change symbol.\n"
-        raise DeprecationWarning, msg
+        raise DeprecationWarning(msg)
 
 class Fit1D(Plottable):
     """

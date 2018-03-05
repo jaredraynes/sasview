@@ -17,7 +17,7 @@ from sas.sasgui.perspectives.pr.pr_widgets import DataDialog
 from sas.sasgui.perspectives.corfunc.corfunc_state import Reader
 from sas.sascalc.dataloader.loader import Loader
 import sas.sascalc.dataloader
-from plot_labels import *
+from .plot_labels import *
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +148,7 @@ class Plugin(PluginBase):
                     self.data_id = data.id
                     self.corfunc_panel.set_data(data)
                 except:
-                    msg = "Corfunc set_data: " + str(sys.exc_value)
+                    msg = "Corfunc set_data: " + str(sys.exc_info()[1])
                     wx.PostEvent(self.parent, StatusEvent(status=msg,
                         info='error'))
 
@@ -187,6 +187,15 @@ class Plugin(PluginBase):
             new_plot.ytransform = 'y'
             group_id = GROUP_ID_TRANSFORM
             # Show the transformation as a curve instead of points
+            new_plot.symbol = GUIFRAME_ID.CURVE_SYMBOL_NUM
+        elif label == IDF_LABEL:
+            new_plot.xaxis("{x}", 'A')
+            new_plot.yaxis("{g_1}", '')
+            # Linear scale
+            new_plot.xtransform = 'x'
+            new_plot.ytransform = 'y'
+            group_id = GROUP_ID_IDF
+            # Show IDF as a curve instead of points
             new_plot.symbol = GUIFRAME_ID.CURVE_SYMBOL_NUM
         new_plot.id = label
         new_plot.name = label
