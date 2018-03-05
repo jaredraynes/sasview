@@ -98,6 +98,9 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         # Globals
         self.initializeGlobals()
 
+        # Set up desired logging level
+        logging.disable(LocalConfig.DISABLE_LOGGING)
+
         # Main GUI setup up
         self.setupUi(self)
         self.setWindowTitle("Fitting")
@@ -1113,7 +1116,8 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
                             batch_outputs=batch_outputs,
                             page_id=[[self.page_id]],
                             updatefn=updater,
-                            completefn=completefn)
+                            completefn=completefn,
+                            reset_flag=self.is_chain_fitting)
 
         if LocalConfig.USING_TWISTED:
             # start the trhrhread with twisted
@@ -1159,8 +1163,7 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         #re-enable the Fit button
         self.setFittingStopped()
 
-        #assert result is not None
-        if assert in None:
+        if result is None:
             msg = "Fitting failed after: %s s.\n" % GuiUtils.formatNumber(elapsed)
             self.communicate.statusBarUpdateSignal.emit(msg)
             return
@@ -1173,6 +1176,7 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
             not np.all(np.isfinite(res.pvec)):
             msg = "Fitting did not converge!"
             self.communicate.statusBarUpdateSignal.emit(msg)
+            msg += res.mesg
             logging.error(msg)
             return
 
@@ -1320,9 +1324,7 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         self.iterateOverModel(createErrorColumn)
 
         # switch off reponse to model change
-        self._model_model.blockSignals(True)
         self._model_model.insertColumn(2, error_column)
-        self._model_model.blockSignals(False)
         FittingUtilities.addErrorHeadersToModel(self._model_model)
         # Adjust the table cells width.
         # TODO: find a way to dynamically adjust column width while resized expanding
