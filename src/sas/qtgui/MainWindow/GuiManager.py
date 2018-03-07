@@ -19,6 +19,7 @@ import sas.qtgui.Utilities.GuiUtils as GuiUtils
 
 import sas.qtgui.Utilities.ObjectLibrary as ObjectLibrary
 from sas.qtgui.Utilities.TabbedModelEditor import TabbedModelEditor
+from sas.qtgui.Utilities.PluginManager import PluginManager
 from sas.qtgui.MainWindow.UI.AcknowledgementsUI import Ui_Acknowledgements
 from sas.qtgui.MainWindow.AboutBox import AboutBox
 from sas.qtgui.MainWindow.WelcomePanel import WelcomePanel
@@ -409,6 +410,7 @@ class GuiManager(object):
         self._workspace.actionChain_Fitting.triggered.connect(self.actionChain_Fitting)
         self._workspace.actionAdd_Custom_Model.triggered.connect(self.actionAdd_Custom_Model)
         self._workspace.actionEdit_Custom_Model.triggered.connect(self.actionEdit_Custom_Model)
+        self._workspace.actionManage_Custom_Models.triggered.connect(self.actionManage_Custom_Models)
         # Window
         self._workspace.actionCascade.triggered.connect(self.actionCascade)
         self._workspace.actionTile.triggered.connect(self.actionTile)
@@ -675,6 +677,12 @@ class GuiManager(object):
         """
         self.model_editor = TabbedModelEditor(self, edit_only=True)
         self.model_editor.show()
+
+    def actionManage_Custom_Models(self):
+        """
+        """
+        self.model_manager = PluginManager(self)
+        self.model_manager.show()
 
     #============ ANALYSIS =================
     def actionFitting(self):

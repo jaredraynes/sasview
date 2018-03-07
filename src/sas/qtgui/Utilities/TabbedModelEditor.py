@@ -16,6 +16,7 @@ from sas.sascalc.fit import models
 from sas.qtgui.Utilities.UI.TabbedModelEditor import Ui_TabbedModelEditor
 from sas.qtgui.Utilities.PluginDefinition import PluginDefinition
 from sas.qtgui.Utilities.ModelEditor import ModelEditor
+import sas.qtgui.Utilities.GuiUtils as GuiUtils
 
 class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
     """
@@ -242,6 +243,9 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
 
         # Set the widget title
         self.setTabEdited(False)
+
+        # Notify listeners
+        self.parent.communicate.customModelDirectoryChanged.emit()
 
     def updateFromEditor(self):
         """

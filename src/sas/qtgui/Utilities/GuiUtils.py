@@ -239,6 +239,9 @@ class Communicate(QtCore.QObject):
     # Send result of Data Operation Utility panel to Data Explorer
     updateModelFromDataOperationPanelSignal = QtCore.pyqtSignal(QtGui.QStandardItem, dict)
 
+    # Notify about a new custom plugin being written/deleted/modified
+    customModelDirectoryChanged = QtCore.pyqtSignal()
+
 def updateModelItemWithPlot(item, update_data, name=""):
     """
     Adds a checkboxed row named "name" to QStandardItem
@@ -873,6 +876,7 @@ def toDouble(value_string):
         return value[0]
     else:
         raise TypeError
+
 
 class DoubleValidator(QtGui.QDoubleValidator):
     """

@@ -109,6 +109,7 @@
     <addaction name="separator"/>
     <addaction name="actionAdd_Custom_Model"/>
     <addaction name="actionEdit_Custom_Model"/>
+    <addaction name="actionManage_Custom_Models"/>
    </widget>
    <widget class="QMenu" name="menuWindow">
     <property name="title">
@@ -508,6 +509,11 @@
   <action name="actionAdd_Custom_Model">
    <property name="text">
     <string>Add Custom Model</string>
+   </property>
+  </action>
+  <action name="actionManage_Custom_Models">
+   <property name="text">
+    <string>Manage Custom Models</string>
    </property>
   </action>
  </widget>

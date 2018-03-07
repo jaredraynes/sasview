@@ -35,6 +35,7 @@ from sas.qtgui.Perspectives.Fitting.ModelThread import Calc1D
 from sas.qtgui.Perspectives.Fitting.ModelThread import Calc2D
 from sas.qtgui.Perspectives.Fitting.FittingLogic import FittingLogic
 from sas.qtgui.Perspectives.Fitting import FittingUtilities
+from sas.qtgui.Perspectives.Fitting import ModelUtilities
 from sas.qtgui.Perspectives.Fitting.SmearingWidget import SmearingWidget
 from sas.qtgui.Perspectives.Fitting.OptionsWidget import OptionsWidget
 from sas.qtgui.Perspectives.Fitting.FitPage import FitPage
@@ -49,6 +50,7 @@ TAB_MAGNETISM = 4
 TAB_POLY = 3
 CATEGORY_DEFAULT = "Choose category..."
 CATEGORY_STRUCTURE = "Structure Factor"
+CATEGORY_CUSTOM = "Plugin Models"
 STRUCTURE_DEFAULT = "None"
 
 DEFAULT_POLYDISP_FUNCTION = 'gaussian'
@@ -210,6 +212,9 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         self.undo_supported = False
         self.page_stack = []
         self.all_data = []
+        # custom plugin models
+        # {model.name:model}
+        self.custom_models = self.customModels()
         # Polydisp widget table default index for function combobox
         self.orig_poly_index = 3
 
@@ -338,6 +343,8 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         self.cbCategory.addItem(CATEGORY_DEFAULT)
         self.cbCategory.addItems(category_list)
         self.cbCategory.addItem(CATEGORY_STRUCTURE)
+        if self.custom_models:
+            self.cbCategory.addItem(CATEGORY_CUSTOM)
         self.cbCategory.setCurrentIndex(0)
 
     def setEnablementOnDataLoad(self):
@@ -414,6 +421,10 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         if self.kernel_module:
             self.onSelectModel()
 
+    def customModels(self):
+        """ Reads in file names in the custom plugin directory """
+        return ModelUtilities._find_models()
+
     def initializeControls(self):
         """
         Set initial control enablement
@@ -467,6 +478,9 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
 
         # Signals from separate tabs asking for replot
         self.options_widget.plot_signal.connect(self.onOptionsUpdate)
+
+        # Signals from other widgets
+        self.communicate.customModelDirectoryChanged.connect(self.onCustomModelChange)
 
     def modelName(self):
         """
@@ -873,6 +887,29 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
             model = None
         self.respondToModelStructure(model=model, structure_factor=structure)
 
+    def onCustomModelChange(self):
+        """
+        Reload the custom model combobox
+        """
+        self.custom_models = self.customModels()
+        self.readCustomCategoryInfo()
+        # See if we need to update the combo in-place
+        if self.cbCategory.currentText() != CATEGORY_CUSTOM: return
+
+        current_text = self.cbModel.currentText()
+        self.cbModel.blockSignals(True)
+        self.cbModel.clear()
+        self.cbModel.blockSignals(False)
+        self.enableModelCombo()
+        self.disableStructureCombo()
+        # Retrieve the list of models
+        model_list = self.master_category_dict[CATEGORY_CUSTOM]
+        # Populate the models combobox
+        self.cbModel.addItems(sorted([model for (model, _) in model_list]))
+        new_index = self.cbModel.findText(current_text)
+        if new_index != -1:
+            self.cbModel.setCurrentIndex(self.cbModel.findText(current_text))
+
     def replaceConstraintName(self, old_name, new_name=""):
         """
         Replace names of models in defined constraints
@@ -936,7 +973,7 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
             self.enableStructureCombo()
             self._model_model.clear()
             return
-
+            
         # Safely clear and enable the model combo
         self.cbModel.blockSignals(True)
         self.cbModel.clear()
@@ -1164,7 +1201,7 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         self.setFittingStopped()
 
         if result is None:
-            msg = "Fitting failed after: %s s.\n" % GuiUtils.formatNumber(elapsed)
+            msg = "Fitting failed."
             self.communicate.statusBarUpdateSignal.emit(msg)
             return
 
@@ -1411,7 +1448,7 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         assert isinstance(param_dict, dict)
         if not dict:
             return
-        if self._model_model.rowCount() == 0:
+        if self._magnet_model.rowCount() == 0:
             return
 
         def iterateOverMagnetModel(func):
@@ -1557,6 +1594,20 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         for model in models:
             self.models[model.name] = model
 
+        self.readCustomCategoryInfo()
+
+    def readCustomCategoryInfo(self):
+        """
+        Reads the custom model category
+        """
+        #Looking for plugins
+        self.plugins = list(self.custom_models.values())
+        plugin_list = []
+        for name, plug in self.custom_models.items():
+            self.models[name] = plug
+            plugin_list.append([name, True])
+        self.master_category_dict[CATEGORY_CUSTOM] = plugin_list
+
     def regenerateModelDict(self):
         """
         Regenerates self.by_model_dict which has each model name as the
@@ -1664,7 +1715,11 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         """
         Setting model parameters into QStandardItemModel based on selected _model_
         """
-        kernel_module = generate.load_kernel_module(model_name)
+        name = model_name
+        if self.cbCategory.currentText() == CATEGORY_CUSTOM:
+            # custom kernel load requires full path
+            name = os.path.join(ModelUtilities.find_plugins_dir(), model_name+".py")
+        kernel_module = generate.load_kernel_module(name)
         self.model_parameters = modelinfo.make_parameter_table(getattr(kernel_module, 'parameters', []))
 
         # Instantiate the current sasmodel
