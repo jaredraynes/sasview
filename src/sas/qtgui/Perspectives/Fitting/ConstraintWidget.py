@@ -110,7 +110,7 @@ class ConstraintWidget(QtWidgets.QWidget, Ui_ConstraintWidgetUI):
         tab_object = ObjectLibrary.getObject(tab)
 
         # Disconnect all local slots
-        tab_object.disconnect()
+        #tab_object.disconnect()
 
         # Reconnect tab signals to local slots
         tab_object.constraintAddedSignal.connect(self.initializeFitList)

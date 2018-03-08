@@ -117,6 +117,12 @@ class TabbedModelEditor(QtWidgets.QDialog, Ui_TabbedModelEditor):
             logging.info("No data file chosen.")
             return
 
+        self.loadFile(filename)
+
+    def loadFile(self, filename):
+        """
+        Performs the load operation and updates the view
+        """
         self.editor_widget.blockSignals(True)
         with open(filename, 'r') as plugin:
             self.editor_widget.txtEditor.setPlainText(plugin.read())

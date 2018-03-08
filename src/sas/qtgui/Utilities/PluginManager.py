@@ -7,7 +7,9 @@ from PyQt5 import QtCore
 from PyQt5 import QtGui
 from PyQt5 import QtWidgets
 
+from sas.sascalc.fit import models
 from sas.qtgui.Perspectives.Fitting import ModelUtilities
+from sas.qtgui.Utilities.TabbedModelEditor import TabbedModelEditor
 
 from sas.qtgui.Utilities.UI.PluginManagerUI import Ui_PluginManagerUI
 
@@ -33,13 +35,11 @@ class PluginManager(QtWidgets.QDialog, Ui_PluginManagerUI):
         # Initialize signals
         self.addSignals()
 
-        # Initialize widgets
-        self.addWidgets()
-
     def readModels(self):
         """
         Read in custom models from the default location
         """
+        self.lstModels.clear()
         plugins = ModelUtilities._find_models()
         models = list(plugins.keys())
         self.lstModels.addItems(models)
@@ -50,13 +50,20 @@ class PluginManager(QtWidgets.QDialog, Ui_PluginManagerUI):
         """
         self.cmdOK.clicked.connect(self.accept)
         self.cmdDelete.clicked.connect(self.onDelete)
-        #self.tblParams.cellChanged.connect(self.onParamsChanged)
+        self.cmdAdd.clicked.connect(self.onAdd)
+        self.cmdEdit.clicked.connect(self.onEdit)
+        self.cmdHelp.clicked.connect(self.onHelp)
+        self.lstModels.selectionModel().selectionChanged.connect(self.onSelectionChanged)
+        self.parent.communicate.customModelDirectoryChanged.connect(self.readModels)
 
-    def addWidgets(self):
+    def onSelectionChanged(self, new_selection, old_selection):
         """
-        Initialize various widgets in the dialog
+        Respond to row selection
+        old_selection: not used here.
         """
-        pass
+        rows = len(self.lstModels.selectionModel().selectedRows())
+        self.cmdDelete.setEnabled(rows>0)
+        self.cmdEdit.setEnabled(rows==1)
 
     def onDelete(self):
         """
@@ -81,3 +88,33 @@ class PluginManager(QtWidgets.QDialog, Ui_PluginManagerUI):
             os.remove(name)
 
         self.parent.communicate.customModelDirectoryChanged.emit()
+
+    def onAdd(self):
+        """
+        Show the add new model dialog
+        """
+        self.add_widget = TabbedModelEditor(parent=self.parent)
+        self.add_widget.show()
+
+    def onEdit(self):
+        """
+        Show the edit existing model dialog
+        """
+        plugin_location = models.find_plugins_dir()
+        # GUI assured only one row selected. Pick up the only element in list.
+        try:
+            model_to_edit = self.lstModels.selectionModel().selectedRows()[0].data()
+        except Exception:
+            # Something wrong with model, return
+            return
+        name = os.path.join(plugin_location, model_to_edit + ".py")
+        self.edit_widget = TabbedModelEditor(parent=self.parent, edit_only=True)
+        self.edit_widget.loadFile(name)
+        self.edit_widget.show()
+
+    def onHelp(self):
+        """
+        Show the help page in the default browser
+        """
+        location = "/user/sasgui/perspectives/fitting/fitting_help.html#new-plugin-model"
+        self.parent.showHelp(location)
