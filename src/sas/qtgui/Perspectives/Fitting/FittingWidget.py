@@ -343,8 +343,6 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         self.cbCategory.addItem(CATEGORY_DEFAULT)
         self.cbCategory.addItems(category_list)
         self.cbCategory.addItem(CATEGORY_STRUCTURE)
-        if self.custom_models:
-            self.cbCategory.addItem(CATEGORY_CUSTOM)
         self.cbCategory.setCurrentIndex(0)
 
     def setEnablementOnDataLoad(self):
@@ -690,7 +688,10 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         """
         Delete constraints from selected parameters.
         """
-        self.deleteConstraintOnParameter(param=None)
+        params =  [s.data() for s in self.lstParams.selectionModel().selectedRows()
+                   if self.isCheckable(s.row())]
+        for param in params:
+            self.deleteConstraintOnParameter(param=param)
 
     def deleteConstraintOnParameter(self, param=None):
         """

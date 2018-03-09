@@ -2,6 +2,7 @@
 import sys
 import os
 import logging 
+from shutil import copyfile
 
 from PyQt5 import QtCore
 from PyQt5 import QtGui
@@ -10,6 +11,7 @@ from PyQt5 import QtWidgets
 from sas.sascalc.fit import models
 from sas.qtgui.Perspectives.Fitting import ModelUtilities
 from sas.qtgui.Utilities.TabbedModelEditor import TabbedModelEditor
+import sas.qtgui.Utilities.GuiUtils as GuiUtils
 
 from sas.qtgui.Utilities.UI.PluginManagerUI import Ui_PluginManagerUI
 
@@ -24,6 +26,9 @@ class PluginManager(QtWidgets.QDialog, Ui_PluginManagerUI):
         self.setupUi(self)
 
         self.parent = parent
+        self.cmdDelete.setEnabled(False)
+        self.cmdEdit.setEnabled(False)
+        self.cmdDuplicate.setEnabled(False)
 
         # globals
         self.readModels()
@@ -51,6 +56,7 @@ class PluginManager(QtWidgets.QDialog, Ui_PluginManagerUI):
         self.cmdOK.clicked.connect(self.accept)
         self.cmdDelete.clicked.connect(self.onDelete)
         self.cmdAdd.clicked.connect(self.onAdd)
+        self.cmdDuplicate.clicked.connect(self.onDuplicate)
         self.cmdEdit.clicked.connect(self.onEdit)
         self.cmdHelp.clicked.connect(self.onHelp)
         self.lstModels.selectionModel().selectionChanged.connect(self.onSelectionChanged)
@@ -64,6 +70,7 @@ class PluginManager(QtWidgets.QDialog, Ui_PluginManagerUI):
         rows = len(self.lstModels.selectionModel().selectedRows())
         self.cmdDelete.setEnabled(rows>0)
         self.cmdEdit.setEnabled(rows==1)
+        self.cmdDuplicate.setEnabled(rows>0)
 
     def onDelete(self):
         """
@@ -96,6 +103,23 @@ class PluginManager(QtWidgets.QDialog, Ui_PluginManagerUI):
         self.add_widget = TabbedModelEditor(parent=self.parent)
         self.add_widget.show()
 
+    def onDuplicate(self):
+        """
+        Creates a copy of the selected model(s)
+        """
+
+        plugins_to_copy = [s.data() for s in self.lstModels.selectionModel().selectedRows()]
+        plugin_dir = ModelUtilities.find_plugins_dir()
+        for plugin in plugins_to_copy:
+            src_filename = plugin + ".py"
+            src_file = os.path.join(plugin_dir, src_filename)
+            dst_filename = GuiUtils.findNextFilename(src_filename, plugin_dir)
+            if not dst_filename:
+                logging.error("Could not find appropriate filename for "+src_file)
+            dst_file = os.path.join(plugin_dir, dst_filename)
+            copyfile(src_file, dst_file)
+            self.parent.communicate.customModelDirectoryChanged.emit()
+
     def onEdit(self):
         """
         Show the edit existing model dialog
@@ -118,3 +142,4 @@ class PluginManager(QtWidgets.QDialog, Ui_PluginManagerUI):
         """
         location = "/user/sasgui/perspectives/fitting/fitting_help.html#new-plugin-model"
         self.parent.showHelp(location)
+                

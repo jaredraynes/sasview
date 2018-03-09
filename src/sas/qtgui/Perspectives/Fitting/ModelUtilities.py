@@ -178,6 +178,7 @@ def _find_models():
 
     plugins = {}
     for filename in os.listdir(directory):
+
         name, ext = os.path.splitext(filename)
         if ext == '.py' and not name == '__init__':
             path = os.path.abspath(os.path.join(directory, filename))

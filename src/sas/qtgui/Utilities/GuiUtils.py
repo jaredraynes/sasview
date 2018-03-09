@@ -877,6 +877,28 @@ def toDouble(value_string):
     else:
         raise TypeError
 
+def findNextFilename(filename, directory):
+    """
+    Finds the next available (non-existing) name for 'filename' in 'directory'.
+    plugin.py -> plugin (n).py  - for first 'n' for which the file doesn't exist
+    """
+    basename, ext = os.path.splitext(filename)
+    # limit the number of copies
+    MAX_FILENAMES = 1000
+    # Start with (1)
+    number_ext = 1
+    proposed_filename = ""
+    found_filename = False
+    # Find the next available filename or exit if too many copies
+    while not found_filename or number_ext > MAX_FILENAMES:
+        proposed_filename = basename + " ("+str(number_ext)+")" + ext
+        if os.path.exists(os.path.join(directory, proposed_filename)):
+            number_ext += 1
+        else:
+            found_filename = True
+
+    return proposed_filename
+
 
 class DoubleValidator(QtGui.QDoubleValidator):
     """
