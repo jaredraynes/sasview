@@ -2,8 +2,9 @@ import json
 import os
 import functools
 
-from PyQt4 import QtGui
-from PyQt4 import QtCore
+from PyQt5 import QtGui
+from PyQt5 import QtCore
+from PyQt5 import QtWidgets
 import sas.sasview
 import sas.qtgui.Utilities.LocalConfig as LocalConfig
 import sas.qtgui.Utilities.GuiUtils as GuiUtils
@@ -11,9 +12,8 @@ import sas.qtgui.Utilities.GuiUtils as GuiUtils
 from collections import defaultdict
 from sas.qtgui.Utilities.CategoryInstaller import CategoryInstaller
 from sasmodels.sasview_model import load_standard_models
-from sas.qtgui.MainWindow.ViewDelegate import CategoryViewDelegate
 
-from UI.CategoryManagerUI import Ui_CategoryManagerUI
+from .UI.CategoryManagerUI import Ui_CategoryManagerUI
 
 class ToolTippedItemModel(QtGui.QStandardItemModel):
 
@@ -29,16 +29,47 @@ class ToolTippedItemModel(QtGui.QStandardItemModel):
         return QtGui.QStandardItemModel.headerData(self, section, orientation, role)
 
 
-class CategoryManager(QtGui.QDialog, Ui_CategoryManagerUI):
+class CategoryManager(QtWidgets.QDialog, Ui_CategoryManagerUI):
     def __init__(self, parent=None):
         super(CategoryManager, self).__init__(parent)
         self.setupUi(self)
 
         self.setWindowTitle("Category Manager")
 
+        self.initializeGlobals()
+
         self.initializeModels()
 
-        self.addActions()
+        #self.addActions()
+
+    def initializeGlobals(self):
+        """
+        Initialize global variables used in this class
+        """
+        # SasModel is loaded
+        self.model_is_loaded = False
+        # Data[12]D passed and set
+        self._previous_category_index = 0
+        # Utility variable for multishell display
+        self.models = {}
+        # Parameters to fit
+        self.undo_supported = False
+        self.page_stack = []
+        self.all_data = []
+
+        #TODO: Need to fix it?
+        #self.page_id = 200 + self.tab_id
+
+        # Data for chosen model
+        self.model_data = None
+
+        # Which shell is being currently displayed?
+        self.current_shell_displayed = 0
+        # List of all shell-unique parameters
+        self.shell_names = []
+
+        # signal communicator
+        #self.communicate = self.parent.communicate
 
     def readCategoryInfo(self):
         """
@@ -87,40 +118,55 @@ class CategoryManager(QtGui.QDialog, Ui_CategoryManagerUI):
         # We can't use a single model here, due to restrictions on flattening
         # the model tree with subclassed QAbstractProxyModel...
         self._category_model = ToolTippedItemModel()
-        self.lstParams.setModel(self._category_model)
+        self.lstCategory.setModel(self._category_model)
         self.readCategoryInfo()
 
         # Delegates for custom editing and display
-        self.lstParams.setItemDelegate(CategoryViewDelegate(self))
+        #self.lstParams.setItemDelegate(CategoryViewDelegate(self))
 
-        self.lstParams.setAlternatingRowColors(True)
-        stylesheet = """
+#        self.lstCategory.setAlternatingRowColors(True)
+#        stylesheet = """
+#
+#            QTreeView {
+#                paint-alternating-row-colors-for-empty-area:0;
+#            }
+#
+#            QTreeView::item:hover {
+#                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #e7effd, stop: 1 #cbdaf1);
+#                border: 1px solid #bfcde4;
+#            }
 
-            QTreeView {
-                paint-alternating-row-colors-for-empty-area:0;
-            }
+#            QTreeView::item:selected {
+#                border: 1px solid #567dbc;
+#            }
 
-            QTreeView::item:hover {
-                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #e7effd, stop: 1 #cbdaf1);
-                border: 1px solid #bfcde4;
-            }
+#            QTreeView::item:selected:active{
+#                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #6ea1f1, stop: 1 #567dbc);
+#            }
 
-            QTreeView::item:selected {
-                border: 1px solid #567dbc;
-            }
+#            QTreeView::item:selected:!active {
+#                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #6b9be8, stop: 1 #577fbf);
+#            }
+#           """
+#        self.lstCategory.setStyleSheet(stylesheet)
+#        self.lstCategory.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+#        self.lstCategory.customContextMenuRequested.connect(self.showModelDescription)
+#        self.lstCategory.setAttribute(QtCore.Qt.WA_MacShowFocusRect, False)
 
-            QTreeView::item:selected:active{
-                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #6ea1f1, stop: 1 #567dbc);
-            }
+    def initializeCategoryCombo(self):
+        """
+        Model category combo setup
+        """
+        category_list = sorted(self.master_category_dict.keys())
+        self.cbCategory.addItem(CATEGORY_DEFAULT)
+        self.cbCategory.addItems(category_list)
+        self.cbCategory.addItem(CATEGORY_STRUCTURE)
+        self.cbCategory.setCurrentIndex(0)
 
-            QTreeView::item:selected:!active {
-                background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #6b9be8, stop: 1 #577fbf);
-            }
-           """
-        self.lstParams.setStyleSheet(stylesheet)
-        self.lstParams.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.lstParams.customContextMenuRequested.connect(self.showModelDescription)
-        self.lstParams.setAttribute(QtCore.Qt.WA_MacShowFocusRect, False)
+    def enableModelCombo(self):
+        """ Enable the combobox """
+        self.cbModel.setEnabled(True)
+        self.lblModel.setEnabled(True)
 
     def regenerateModelDict(self):
         """
