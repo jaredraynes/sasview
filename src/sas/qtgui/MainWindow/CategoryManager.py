@@ -92,24 +92,6 @@ class CategoryManager(QtWidgets.QDialog, Ui_CategoryManagerUI):
             self.models[model.name] = model
 
 
-    def checkboxSelected(self, item):
-        # Assure we're dealing with checkboxes
-        if not item.isCheckable():
-            return
-        status = item.checkState()
-
-        def isCheckable(row):
-            return self._category_model.item(row, 0).isCheckable()
-
-        # If multiple rows selected - toggle all of them, filtering uncheckable
-        rows = [s.row() for s in self.lstParams.selectionModel().selectedRows() if isCheckable(s.row())]
-
-        # Switch off signaling from the model to avoid recursion
-        self._category_model.blockSignals(True)
-        # Convert to proper indices and set requested enablement
-        [self._category_model.item(row, 0).setCheckState(status) for row in rows]
-        self._category_model.blockSignals(False)
-
     def initializeModels(self):
         """
         Set up models and views
@@ -120,6 +102,7 @@ class CategoryManager(QtWidgets.QDialog, Ui_CategoryManagerUI):
         self._category_model = ToolTippedItemModel()
         self.lstCategory.setModel(self._category_model)
         self.readCategoryInfo()
+        self.initializeModelList()
 
         # Delegates for custom editing and display
         #self.lstParams.setItemDelegate(CategoryViewDelegate(self))
@@ -153,16 +136,35 @@ class CategoryManager(QtWidgets.QDialog, Ui_CategoryManagerUI):
 #        self.lstCategory.customContextMenuRequested.connect(self.showModelDescription)
 #        self.lstCategory.setAttribute(QtCore.Qt.WA_MacShowFocusRect, False)
 
-    def initializeCategoryCombo(self):
+    def initializeModelList(self):
         """
         Model category combo setup
         """
         category_list = sorted(self.master_category_dict.keys())
-        self.cbCategory.addItem(CATEGORY_DEFAULT)
-        self.cbCategory.addItems(category_list)
-        self.cbCategory.addItem(CATEGORY_STRUCTURE)
-        self.cbCategory.setCurrentIndex(0)
+        #Move current category to the top of the list and then continue alphablitecaly
 
+        #self._category_model.appendRow([QtGui.QStandardItem(model) for model in self.models])
+        for model in self.models:
+            item = QtGui.QStandardItem(model)
+            # Add a checkbox to it
+            item.setCheckable(True)
+            self._category_model.appendRow(item)
+        self.lstCategory.setModel(self._category_model)
+        self._category_model.insertColumn(1,[])
+
+        for ind, model in enumerate(self.models):
+            for cat_index, cat_key in enumerate(category_list):
+                if model in self.master_category_dict[cat_key]:
+                    current_cat = category_list.pop(cat_index)
+                    category_list.insert(0, current_cat)
+            #Define cbCategory
+            cbCategory = QtWidgets.QComboBox()
+            cbCategory.addItems(category_list)
+            cbCategory.addItem("New Category")
+            cbCategory.setCurrentIndex(0)
+            ind = self._category_model.index(ind,1)
+            self.lstCategory.setIndexWidget(ind,cbCategory)
+        
     def enableModelCombo(self):
         """ Enable the combobox """
         self.cbModel.setEnabled(True)
