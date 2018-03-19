@@ -62,10 +62,9 @@ class PluginManager(QtWidgets.QDialog, Ui_PluginManagerUI):
         self.lstModels.selectionModel().selectionChanged.connect(self.onSelectionChanged)
         self.parent.communicate.customModelDirectoryChanged.connect(self.readModels)
 
-    def onSelectionChanged(self, new_selection, old_selection):
+    def onSelectionChanged(self):
         """
         Respond to row selection
-        old_selection: not used here.
         """
         rows = len(self.lstModels.selectionModel().selectedRows())
         self.cmdDelete.setEnabled(rows>0)

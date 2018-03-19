@@ -673,7 +673,9 @@ class ConstraintWidget(QtWidgets.QWidget, Ui_ConstraintWidgetUI):
         model1, param1, operator, constraint_text = cc_widget.constraint()
 
         constraint.func = constraint_text
+        # param1 is the parameter we're constraining
         constraint.param = param1
+
         # Find the right tab
         constrained_tab = self.getObjectByName(model1)
         if constrained_tab is None:

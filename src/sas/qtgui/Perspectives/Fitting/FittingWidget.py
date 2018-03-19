@@ -473,6 +473,7 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         #self.constraintAddedSignal.connect(self.modifyViewOnConstraint)
         self._poly_model.itemChanged.connect(self.onPolyModelChange)
         self._magnet_model.itemChanged.connect(self.onMagnetModelChange)
+        self.lstParams.selectionModel().selectionChanged.connect(self.onSelectionChanged)
 
         # Signals from separate tabs asking for replot
         self.options_widget.plot_signal.connect(self.onOptionsUpdate)
@@ -587,9 +588,14 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
 
         # widget.params[0] is the parameter we're constraining
         constraint.param = mc_widget.params[0]
-        # Function should have the model name preamble
+        # parameter should have the model name preamble
         model_name = self.kernel_module.name
-        constraint.func = model_name + "." + c_text
+        # param_used is the parameter we're using in constraining function
+        param_used = mc_widget.params[1]
+        # Replace param_used with model_name.param_used
+        updated_param_used = model_name + "." + param_used
+        new_func = c_text.replace(param_used, updated_param_used)
+        constraint.func = new_func
         # Which row is the constrained parameter in?
         row = self.getRowFromName(constraint.param)
 
@@ -700,11 +706,11 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         min_col = self.lstParams.itemDelegate().param_min
         max_col = self.lstParams.itemDelegate().param_max
         for row in range(self._model_model.rowCount()):
+            if not self.rowHasConstraint(row):
+                continue
             # Get the Constraint object from of the model item
             item = self._model_model.item(row, 1)
-            if not item.hasChildren():
-                continue
-            constraint = item.child(0).data()
+            constraint = self.getConstraintForRow(row)
             if constraint is None:
                 continue
             if not isinstance(constraint, Constraint):
@@ -830,6 +836,45 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
 
         return constraints
 
+    def getConstraintsForFitting(self):
+        """
+        Return a list of constraints in format ready for use in fiting
+        """
+        # Get constraints
+        constraints = self.getComplexConstraintsForModel()
+        # See if there are any constraints across models
+        multi_constraints = [cons for cons in constraints if self.isConstraintMultimodel(cons[1])]
+        # intersection of parameters to fit and multi constraints
+        # impossible_constraints = set(multi_constraints).intersection(set(self.parameters_to_fit))
+        # local constraints only
+        # constraints = list(set(constraints)-set(impossible_constraints))
+
+        if multi_constraints:
+            # Let users choose what to do
+            msg = "The current fit contains constraints relying on other fit pages.\n"
+            msg += "Parameters with those constraints are:\n" +\
+                '\n'.join([cons[0] for cons in multi_constraints])
+            msg += "\n\nWould you like to remove these constraints or cancel fitting?"
+            msgbox = QtWidgets.QMessageBox(self)
+            msgbox.setIcon(QtWidgets.QMessageBox.Warning)
+            msgbox.setText(msg)
+            button_remove = QtWidgets.QPushButton("Remove")
+            msgbox.addButton(button_remove, QtWidgets.QMessageBox.YesRole)
+            button_cancel = QtWidgets.QPushButton("Cancel")
+            msgbox.addButton(button_cancel, QtWidgets.QMessageBox.RejectRole)
+            retval = msgbox.exec_()
+            if retval == QtWidgets.QMessageBox.RejectRole:
+                # cancel fit
+                raise ValueError("Fitting cancelled")
+            else:
+                # remove constraint
+                for cons in multi_constraints:
+                    self.deleteConstraintOnParameter(param=cons[0])
+                # re-read the constraints
+                constraints = self.getComplexConstraintsForModel()
+
+        return constraints
+
     def showModelDescription(self):
         """
         Creates a window with model description, when right clicked in the treeview
@@ -911,6 +956,21 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         if new_index != -1:
             self.cbModel.setCurrentIndex(self.cbModel.findText(current_text))
 
+    def onSelectionChanged(self):
+        """
+        React to parameter selection
+        """
+        rows = self.lstParams.selectionModel().selectedRows()
+        # Clean previous messages
+        self.communicate.statusBarUpdateSignal.emit("")
+        if len(rows) == 1:
+            # Show constraint, if present
+            row = rows[0].row()
+            if self.rowHasConstraint(row):
+                func = self.getConstraintForRow(row).func
+                if func is not None:
+                    self.communicate.statusBarUpdateSignal.emit("Active constrain: "+func)
+
     def replaceConstraintName(self, old_name, new_name=""):
         """
         Replace names of models in defined constraints
@@ -923,6 +983,16 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
                 if old_name in func:
                     new_func = func.replace(old_name, new_name)
                     self._model_model.item(row, 1).child(0).data().func = new_func
+
+    def isConstraintMultimodel(self, constraint):
+        """
+        Check if the constraint function text contains current model name
+        """
+        current_model_name = self.kernel_module.name
+        if current_model_name in constraint:
+            return False
+        else:
+            return True
 
     def updateData(self):
         """
@@ -1142,7 +1212,7 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
             fitters, _ = self.prepareFitters()
         except ValueError as ex:
             # This should not happen! GUI explicitly forbids this situation
-            self.communicate.statusBarUpdateSignal.emit('Fitting attempt without parameters.')
+            self.communicate.statusBarUpdateSignal.emit(str(ex))
             return
 
         # Create the fitting thread, based on the fitter
@@ -1268,7 +1338,8 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         # deal with it until Python gets discriminated unions
         smearing, accuracy, smearing_min, smearing_max = self.smearing_widget.state()
 
-        constraints = self.getComplexConstraintsForModel()
+        constraints = self.getConstraintsForFitting()
+
         smearer = None
         handler = None
         batch_inputs = {}
@@ -1282,8 +1353,7 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
                 fitter_single.set_model(model, fit_id, params_to_fit, data=data,
                              constraints=constraints)
             except ValueError as ex:
-                logging.error("Setting model parameters failed with: %s" % ex)
-                return
+                raise ValueError("Setting model parameters failed with: %s" % ex)
 
             qmin, qmax, _ = self.logic.computeRangeFromData(data)
             fitter_single.set_data(data=data, id=fit_id, smearer=smearer, qmin=qmin,
