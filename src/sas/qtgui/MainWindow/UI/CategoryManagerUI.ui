@@ -45,16 +45,16 @@
         </spacer>
        </item>
        <item>
-        <widget class="QPushButton" name="okButton">
+        <widget class="QPushButton" name="removeButton">
          <property name="text">
-          <string>OK</string>
+          <string>Remove Selected</string>
          </property>
         </widget>
        </item>
        <item>
         <widget class="QPushButton" name="resetButton">
          <property name="text">
-          <string>Apply</string>
+          <string>Reset</string>
          </property>
         </widget>
        </item>
@@ -191,7 +191,7 @@ p, li { white-space: pre-wrap; }
    </hints>
   </connection>
   <connection>
-   <sender>okButton</sender>
+   <sender>removeButton</sender>
    <signal>clicked()</signal>
    <receiver>CategoryManagerUI</receiver>
    <slot>accept()</slot>
