@@ -5,9 +5,6 @@ import functools
 from PyQt5 import QtGui
 from PyQt5 import QtCore
 from PyQt5 import QtWidgets
-import sas.sasview
-import sas.qtgui.Utilities.LocalConfig as LocalConfig
-import sas.qtgui.Utilities.GuiUtils as GuiUtils
 
 from collections import defaultdict
 from sas.qtgui.Utilities.CategoryInstaller import CategoryInstaller
@@ -170,7 +167,8 @@ class CategoryManager(QtWidgets.QDialog, Ui_CategoryManagerUI):
             #Define cbCategory
             cbCategory = QtWidgets.QComboBox()
             cbCategory.addItems(category_list)
-            cbCategory.addItem("+New Category")
+            cbCategory.setEditable(True)
+            cbCategory.addItem(QtGui.QIcon(":/res/bookmark.png"), "New Category")
             cbCategory.setCurrentIndex(0)
             ind = self._category_model.index(ind,1)
             self.lstCategory.setIndexWidget(ind,cbCategory)
