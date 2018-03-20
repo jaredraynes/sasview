@@ -844,10 +844,6 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         constraints = self.getComplexConstraintsForModel()
         # See if there are any constraints across models
         multi_constraints = [cons for cons in constraints if self.isConstraintMultimodel(cons[1])]
-        # intersection of parameters to fit and multi constraints
-        # impossible_constraints = set(multi_constraints).intersection(set(self.parameters_to_fit))
-        # local constraints only
-        # constraints = list(set(constraints)-set(impossible_constraints))
 
         if multi_constraints:
             # Let users choose what to do
@@ -858,6 +854,8 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
             msgbox = QtWidgets.QMessageBox(self)
             msgbox.setIcon(QtWidgets.QMessageBox.Warning)
             msgbox.setText(msg)
+            msgbox.setWindowTitle("Existing Constraints")
+            # custom buttons
             button_remove = QtWidgets.QPushButton("Remove")
             msgbox.addButton(button_remove, QtWidgets.QMessageBox.YesRole)
             button_cancel = QtWidgets.QPushButton("Cancel")
