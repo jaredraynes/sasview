@@ -47,6 +47,8 @@ class CategoryManager(QtWidgets.QDialog, Ui_CategoryManagerUI):
 
         self.initializeModels()
 
+        self.initializeSignals()
+
         #self.addActions()
 
     def initializeGlobals(self):
@@ -78,6 +80,7 @@ class CategoryManager(QtWidgets.QDialog, Ui_CategoryManagerUI):
         # signal communicator
         #self.communicate = self.parent.communicate
 
+
     def readCategoryInfo(self):
         """
         Reads the categories in from file
@@ -98,6 +101,7 @@ class CategoryManager(QtWidgets.QDialog, Ui_CategoryManagerUI):
         for model in models:
             self.models[model.name] = model
 
+        self.category_list = sorted(self.master_category_dict.keys())
 
     def initializeModels(self):
         """
@@ -146,7 +150,6 @@ class CategoryManager(QtWidgets.QDialog, Ui_CategoryManagerUI):
         """
         Model category combo setup
         """
-        category_list = sorted(self.master_category_dict.keys())
         #Move current category to the top of the list and then continue alphablitecaly
 
         #self._category_model.appendRow([QtGui.QStandardItem(model) for model in self.models])
@@ -160,18 +163,31 @@ class CategoryManager(QtWidgets.QDialog, Ui_CategoryManagerUI):
         self._category_model.insertColumn(1,[])
 
         for ind, model in enumerate(self.models):
-            for cat_index, cat_key in enumerate(category_list):
+            for cat_index, cat_key in enumerate(self.category_list):
                 if model in self.master_category_dict[cat_key]:
-                    current_cat = category_list.pop(cat_index)
-                    category_list.insert(0, current_cat)
+                    current_cat = self.category_list.pop(cat_index)
+                    self.category_list.insert(0, current_cat)
             #Define cbCategory
-            cbCategory = QtWidgets.QComboBox()
-            cbCategory.addItems(category_list)
-            cbCategory.setEditable(True)
-            cbCategory.addItem(QtGui.QIcon(":/res/bookmark.png"), "New Category")
-            cbCategory.setCurrentIndex(0)
+            #TODO: That's probably not good strategu to store this data type as it is not fully controlled and works on current version
+            self.cbCategory = QtWidgets.QComboBox()
+            self.cbCategory.addItems(self.category_list)
+            self.cbCategory.setEditable(True)
+            self.cbCategory.addItem(QtGui.QIcon(":/res/bookmark.png"), "New Category")
+            self.cbCategory.setCurrentIndex(0)
             ind = self._category_model.index(ind,1)
-            self.lstCategory.setIndexWidget(ind,cbCategory)
+            self.lstCategory.setIndexWidget(ind,self.cbCategory)
+        #Whenever new category is added it should be updated in all other comboboxes
+
+    def onNewCategory(self, text):
+        """
+        When the new category is created
+        :return:
+        """
+        # editTextChanged() has to be caught
+        # When text is edited category_list needs to be updated and models initialized again
+        text = self.cbCategory.currentText()
+        self.category_list.append(text)
+        self.initializeModelList()
 
     def enableModelCombo(self):
         """ Enable the combobox """
@@ -190,12 +206,21 @@ class CategoryManager(QtWidgets.QDialog, Ui_CategoryManagerUI):
                 self.by_model_dict[model].append(category)
                 self.model_enabled_dict[model] = enabled
 
+    def initializeSignals(self):
+        """
+
+        :return:
+        """
+        #TODO: Probably won't work as it is combobox property
+        self.cbCategory.editTextChanged.connect(self.onNewCategory)
+
     def addActions(self):
         """
         Add actions to the logo push buttons
         """
 
         self.cmdOK.clicked.connect(self.close)
+
 
     def setTableProperties(self, table):
         """
