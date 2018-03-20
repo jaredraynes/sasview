@@ -23,6 +23,7 @@ from sas.sascalc.fit.BumpsFitting import BumpsFit as Fit
 
 import sas.qtgui.Utilities.GuiUtils as GuiUtils
 import sas.qtgui.Utilities.LocalConfig as LocalConfig
+from sas.qtgui.Utilities.GridPanel import BatchOutputPanel
 from sas.qtgui.Utilities.CategoryInstaller import CategoryInstaller
 from sas.qtgui.Plotting.PlotterData import Data1D
 from sas.qtgui.Plotting.PlotterData import Data2D
@@ -84,6 +85,9 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
     """
     constraintAddedSignal = QtCore.pyqtSignal(list)
     newModelSignal = QtCore.pyqtSignal()
+    fittingFinishedSignal = QtCore.pyqtSignal(tuple)
+    batchFittingFinishedSignal = QtCore.pyqtSignal(tuple)
+
     def __init__(self, parent=None, data=None, tab_id=1):
 
         super(FittingWidget, self).__init__()
@@ -474,6 +478,10 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         self._poly_model.itemChanged.connect(self.onPolyModelChange)
         self._magnet_model.itemChanged.connect(self.onMagnetModelChange)
         self.lstParams.selectionModel().selectionChanged.connect(self.onSelectionChanged)
+
+        # Local signals
+        self.batchFittingFinishedSignal.connect(self.batchFitComplete)
+        self.fittingFinishedSignal.connect(self.fitComplete)
 
         # Signals from separate tabs asking for replot
         self.options_widget.plot_signal.connect(self.onOptionsUpdate)
@@ -1214,7 +1222,7 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
             return
 
         # Create the fitting thread, based on the fitter
-        completefn = self.batchFitComplete if self.is_batch_fitting else self.fitComplete
+        completefn = self.batchFittingCompleted if self.is_batch_fitting else self.fittingCompleted
 
         calc_fit = FitThread(handler=handler,
                             fn=fitters,
@@ -1251,6 +1259,12 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         print("FIT FAILED: ", reason)
         pass
 
+    def batchFittingCompleted(self, result):
+        """
+        Send the finish message from calculate threads to main thread
+        """
+        self.batchFittingFinishedSignal.emit(result)
+
     def batchFitComplete(self, result):
         """
         Receive and display batch fitting results
@@ -1260,6 +1274,12 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         # Show the grid panel
         self.grid_window = BatchOutputPanel(parent=self, output_data=result[0])
         self.grid_window.show()
+
+    def fittingCompleted(self, result):
+        """
+        Send the finish message from calculate threads to main thread
+        """
+        self.fittingFinishedSignal.emit(result)
 
     def fitComplete(self, result):
         """
