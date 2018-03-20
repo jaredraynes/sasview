@@ -10,42 +10,6 @@ import sas.qtgui.Utilities.GuiUtils as GuiUtils
 from sas.qtgui.Utilities.UI.GridPanelUI import Ui_GridPanelUI
 
 
-class GridPanelDelegate(QtWidgets.QItemDelegate):
-
-    def __init__(self, parent = None):
-        super(GridPanelDelegate, self).__init__(parent)
-
-
-    def createEditor(self, parent, styleOption, index):
-        editor = QtWidgets.QLineEdit(parent)
-        # create a completer with the strings in the column as model
-        allStrings = []
-        for i in range(1, index.model().rowCount()):
-            strItem = index.model().data(index.sibling(i, index.column()), QtCore.Qt.EditRole)
-            if strItem not in allStrings:
-                allStrings.append(strItem)
-
-        autoComplete = QtWidgets.QCompleter(allStrings)
-        editor.setCompleter(autoComplete)
-        editor.editingFinished.connect(self.commitAndCloseEditor)
-        return editor
-
-
-    def commitAndCloseEditor(self):
-        editor = self.sender()
-        self.commitData.emit(editor)
-        self.closeEditor.emit(editor, QtWidgets.QAbstractItemDelegate.NoHint)
-
-
-    def setEditorData(self, editor, index):
-        if isinstance(editor, QtWidgets.QLineEdit):
-            editor.setText(index.model().data(index, QtCore.Qt.EditRole))
-
-
-    def setModelData(self, editor, model, index):
-        if isinstance(editor, QtWidgets.QLineEdit):
-            model.setData(index, editor.text())
-
 class BatchOutputPanel(QtWidgets.QMainWindow, Ui_GridPanelUI):
     """
     Class for stateless grid-like printout of model parameters for mutiple models
@@ -237,7 +201,7 @@ class BatchOutputPanel(QtWidgets.QMainWindow, Ui_GridPanelUI):
             for i_col, col in enumerate(row.rstrip().split(',')):
                 self.tblParams.setItem(i_row, i_col, QtWidgets.QTableWidgetItem(col))
 
-        pass
+        self.tblParams.resizeColumnsToContents()
 
     def setupTable(self, data):
         """
@@ -280,7 +244,7 @@ class BatchOutputPanel(QtWidgets.QMainWindow, Ui_GridPanelUI):
                 self.tblParams.setItem(i_row, i_col+2, QtWidgets.QTableWidgetItem(
                     GuiUtils.formatNumber(par_value, high=True)))
 
-        pass
+        self.tblParams.resizeColumnsToContents()
 
     def writeBatchToFile(self, data, tmpfile, details=""):
         """
