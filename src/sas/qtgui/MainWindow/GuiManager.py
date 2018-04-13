@@ -20,6 +20,7 @@ import sas.qtgui.Utilities.GuiUtils as GuiUtils
 import sas.qtgui.Utilities.ObjectLibrary as ObjectLibrary
 from sas.qtgui.Utilities.TabbedModelEditor import TabbedModelEditor
 from sas.qtgui.Utilities.PluginManager import PluginManager
+from sas.qtgui.Utilities.ReportDialog import ReportDialog
 from sas.qtgui.MainWindow.UI.AcknowledgementsUI import Ui_Acknowledgements
 from sas.qtgui.MainWindow.AboutBox import AboutBox
 from sas.qtgui.MainWindow.WelcomePanel import WelcomePanel
@@ -496,8 +497,8 @@ class GuiManager(object):
     def actionReport(self):
         """
         """
-        print("actionReport TRIGGERED")
-        pass
+        self.report_dialog = ReportDialog(self)
+        self.report_dialog.show()
 
     def actionReset(self):
         """
