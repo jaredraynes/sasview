@@ -242,6 +242,9 @@ class Communicate(QtCore.QObject):
     # Notify about a new custom plugin being written/deleted/modified
     customModelDirectoryChanged = QtCore.pyqtSignal()
 
+    # Action Save Analysis triggered
+    saveAnalysisSignal = QtCore.pyqtSignal()
+
 def updateModelItemWithPlot(item, update_data, name=""):
     """
     Adds a checkboxed row named "name" to QStandardItem

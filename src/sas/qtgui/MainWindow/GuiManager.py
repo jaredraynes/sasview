@@ -458,10 +458,9 @@ class GuiManager(object):
 
     def actionSave_Analysis(self):
         """
+        Menu File/Save Analysis
         """
-        print("actionSave_Analysis TRIGGERED")
-
-        pass
+        self.communicate.saveAnalysisSignal.emit()
 
     def actionQuit(self):
         """
