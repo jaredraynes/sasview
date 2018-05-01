@@ -495,9 +495,15 @@ class GuiManager(object):
 
     def actionReport(self):
         """
+        Show the Fit Report dialog.
         """
-        self.report_dialog = ReportDialog(self)
-        self.report_dialog.show()
+        report_list = None
+        if getattr(self._current_perspective, "currentTab"):
+            report_list = self._current_perspective.currentTab.getReport()
+
+        if report_list is not None:
+            self.report_dialog = ReportDialog(parent=self, report_list=report_list)
+            self.report_dialog.show()
 
     def actionReset(self):
         """

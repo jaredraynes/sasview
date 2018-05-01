@@ -496,6 +496,7 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         # Signals from other widgets
         self.communicate.customModelDirectoryChanged.connect(self.onCustomModelChange)
         self.communicate.saveAnalysisSignal.connect(self.savePageState)
+        #self.communicate.saveReportSignal.connect(self.saveReport)
 
     def modelName(self):
         """
@@ -2555,6 +2556,99 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         if self.page_stack:
             self.page_stack.pop()
 
+    def getReport(self):
+        """
+        Create and return local PageState
+        """
+        from sas.sascalc.fit.pagestate import Reader
+        model = self.kernel_module
+
+        # Old style PageState object
+        state = PageState(model=model, data=self.data)
+
+        # Add parameter data to the state
+        self.getCurrentFitState(state)
+
+        # Get plot image from plotpanel
+        #images, canvases = self.getImages()
+        #imgRAM, images, refs = self.buildPlotsForReport(images, canvases)
+
+        #report_str, text_str = state.report(fig_urls=refs)
+
+        #report_list = [report_str, text_str, images]
+
+        report_header = self.reportHeader()
+
+        report_parameters = self.reportParams()
+
+        report_list = report_header + rreport_parameters
+
+        return report_list
+
+    def reportHeader(self):
+        """
+        Look at widget state and extract report header info
+        """
+        import datetime
+        report = ""
+
+        # Simple html report template
+        HEADER = "<html>\n"
+        HEADER += "<head>\n"
+        HEADER += "<meta http-equiv=Content-Type content='text/html; "
+        HEADER += "charset=windows-1252'> \n"
+        HEADER += "<meta name=Generator >\n"
+        HEADER += "</head>\n"
+        HEADER += "<body lang=EN-US>\n"
+        HEADER += "<div class=WordSection1>\n"
+        HEADER += "<p class=MsoNormal><b><span ><center><font size='4' >"
+        HEADER += "%s</font></center></span></center></b></p>"
+        HEADER += "<p class=MsoNormal>&nbsp;</p>"
+        PARA = "<p class=MsoNormal><font size='4' > %s \n"
+        PARA += "</font></p>"
+        CENTRE = "<p class=MsoNormal><center><font size='4' > %s \n"
+        CENTRE += "</font></center></p>"
+
+        title = self.nameFromData(self.data)
+        current_time = datetime.datetime.now().strftime("%I:%M%p, %B %d, %Y")
+        #date = datetime.date.today().ctime()
+        filename = self.data.filename
+        modelname = self.kernel_module.id
+        qrange = "min = {}, max = {}".format(self.q_range_min, self.q_range_max)
+        #chi2 = "Chi2/Npts = {}".format(self.chi2)
+
+        title = title + " [" + current_time + "]"
+        title_name = HEADER % title
+        report = title_name
+        report = report + CENTRE % "File name:{}\n".format(filename)
+        report = report + CENTRE % "Model name:{}\n".format(modelname)
+        report = report + CENTRE % "Q Range: {}\n".format(qrange)
+        chi2_repr = GuiUtils.formatNumber(self.chi2, high=True)
+        report = report + CENTRE % "Chi2/Npts:{}\n".format(chi2_repr)
+
+        return report
+
+    def reportParams(self):
+        """
+        Look at widget state and extract parameters
+        """
+        pars = self.getStandardParam()
+
+        for par, value in pars.items():
+            par_name = value[1]
+            par_fixed = not value[0]
+            par_value = str(value[2])
+            par_unit = value[7]
+            if par_fixed:
+                error = "(fixed)"
+            else:
+                error = str(0.1)
+            param = par_name + " = " + par_value + " ± " + error + " " + par_unit
+            report += CENTRE % param + "\n"
+
+
+        return report
+
     def savePageState(self):
         """
         Create and serialize local PageState
@@ -2678,7 +2772,7 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         p = self.model_parameters
         # save checkbutton state and txtcrtl values
         state.parameters = self.getStandardParam()
-        self.state.orientation_params_disp = self.getOrientationParam()
+        state.orientation_params_disp = self.getOrientationParam()
 
         #self._copy_parameters_state(self.orientation_params_disp, self.state.orientation_params_disp)
         #self._copy_parameters_state(self.parameters, self.state.parameters)
@@ -2760,23 +2854,3 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
 
         raise ValueError("Model does not contain parameter %s" % name)
 
-    def getParamList(self):
-        """
-        Return a list of all available parameters for the model
-        """
-        list = _ordered_keys(self.params)
-        # WARNING: Extending the list with the dispersion parameters
-        list.extend(self.getDispParamList())
-        return list
-
-    def getDispParamList(self):
-        """
-        Return a list of all available parameters for the model
-        """
-        list = []
-        for item in _ordered_keys(self.dispersion):
-            for p in _ordered_keys(self.dispersion[item]):
-                if p not in ['type']:
-                    list.append('%s.%s' % (item.lower(), p.lower()))
-
-        return list

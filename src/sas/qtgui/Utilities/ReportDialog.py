@@ -14,18 +14,18 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
     """
     Class for stateless grid-like printout of model parameters for mutiple models
     """
-    def __init__(self, parent = None, output_data=None):
+    def __init__(self, parent = None, report_list=None):
 
-        super(ReportDialog, self).__init__()
+        super(ReportDialog, self).__init__(parent._parent)
         self.setupUi(self)
 
-        self.data = output_data
+        self.data = report_list
         self.parent = parent
         if hasattr(self.parent, "communicate"):
             self.communicate = parent.communicate
 
         # Fill in the table from input data
-        self.setupDialog(output_data)
+        self.setupDialog(self.data)
 
         # Command buttons
         self.cmdPrint.clicked.connect(self.onPrint)
@@ -35,7 +35,7 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
         """
         """
         if output is not None:
-            self.txtbrowser.setHtml(output)
+            self.txtBrowser.setHtml(output)
 
     def onPrint(self):
         """
