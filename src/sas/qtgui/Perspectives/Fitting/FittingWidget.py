@@ -47,6 +47,8 @@ from sas.qtgui.Perspectives.Fitting.ViewDelegate import PolyViewDelegate
 from sas.qtgui.Perspectives.Fitting.ViewDelegate import MagnetismViewDelegate
 from sas.qtgui.Perspectives.Fitting.Constraint import Constraint
 from sas.qtgui.Perspectives.Fitting.MultiConstraint import MultiConstraint
+from sas.qtgui.Perspectives.Fitting.ReportPageLogic import ReportPageLogic
+
 
 
 TAB_MAGNETISM = 4
@@ -2558,96 +2560,19 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
 
     def getReport(self):
         """
-        Create and return local PageState
+        Create and return HTML report with parameters and charts
         """
-        from sas.sascalc.fit.pagestate import Reader
         model = self.kernel_module
+        if model is None:
+            return HEADER % "No model defined"
 
-        # Old style PageState object
-        state = PageState(model=model, data=self.data)
+        report_logic = ReportPageLogic(self,
+                                       kernel_module=self.kernel_module,
+                                       data=self.data,
+                                       index=self._index,
+                                       model=self._model_model)
 
-        # Add parameter data to the state
-        self.getCurrentFitState(state)
-
-        # Get plot image from plotpanel
-        #images, canvases = self.getImages()
-        #imgRAM, images, refs = self.buildPlotsForReport(images, canvases)
-
-        #report_str, text_str = state.report(fig_urls=refs)
-
-        #report_list = [report_str, text_str, images]
-
-        report_header = self.reportHeader()
-
-        report_parameters = self.reportParams()
-
-        report_list = report_header + rreport_parameters
-
-        return report_list
-
-    def reportHeader(self):
-        """
-        Look at widget state and extract report header info
-        """
-        import datetime
-        report = ""
-
-        # Simple html report template
-        HEADER = "<html>\n"
-        HEADER += "<head>\n"
-        HEADER += "<meta http-equiv=Content-Type content='text/html; "
-        HEADER += "charset=windows-1252'> \n"
-        HEADER += "<meta name=Generator >\n"
-        HEADER += "</head>\n"
-        HEADER += "<body lang=EN-US>\n"
-        HEADER += "<div class=WordSection1>\n"
-        HEADER += "<p class=MsoNormal><b><span ><center><font size='4' >"
-        HEADER += "%s</font></center></span></center></b></p>"
-        HEADER += "<p class=MsoNormal>&nbsp;</p>"
-        PARA = "<p class=MsoNormal><font size='4' > %s \n"
-        PARA += "</font></p>"
-        CENTRE = "<p class=MsoNormal><center><font size='4' > %s \n"
-        CENTRE += "</font></center></p>"
-
-        title = self.nameFromData(self.data)
-        current_time = datetime.datetime.now().strftime("%I:%M%p, %B %d, %Y")
-        #date = datetime.date.today().ctime()
-        filename = self.data.filename
-        modelname = self.kernel_module.id
-        qrange = "min = {}, max = {}".format(self.q_range_min, self.q_range_max)
-        #chi2 = "Chi2/Npts = {}".format(self.chi2)
-
-        title = title + " [" + current_time + "]"
-        title_name = HEADER % title
-        report = title_name
-        report = report + CENTRE % "File name:{}\n".format(filename)
-        report = report + CENTRE % "Model name:{}\n".format(modelname)
-        report = report + CENTRE % "Q Range: {}\n".format(qrange)
-        chi2_repr = GuiUtils.formatNumber(self.chi2, high=True)
-        report = report + CENTRE % "Chi2/Npts:{}\n".format(chi2_repr)
-
-        return report
-
-    def reportParams(self):
-        """
-        Look at widget state and extract parameters
-        """
-        pars = self.getStandardParam()
-
-        for par, value in pars.items():
-            par_name = value[1]
-            par_fixed = not value[0]
-            par_value = str(value[2])
-            par_unit = value[7]
-            if par_fixed:
-                error = "(fixed)"
-            else:
-                error = str(0.1)
-            param = par_name + " = " + par_value + " ± " + error + " " + par_unit
-            report += CENTRE % param + "\n"
-
-
-        return report
+        return report_logic.reportList()
 
     def savePageState(self):
         """
@@ -2722,7 +2647,6 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
 
         state.enable2D = self.is2D
 
-        #state.values = self.values
         #state.weights = copy.deepcopy(self.weights)
         # save data
         state.data = copy.deepcopy(self.data)
@@ -2732,11 +2656,9 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         state.qmax = self.q_range_max
         state.npts = self.npts
 
-        #if hasattr(self, "enable_disp"):
         #    self.state.enable_disp = self.enable_disp.GetValue()
         #    self.state.disable_disp = self.disable_disp.GetValue()
 
-        #if hasattr(self, "enable_smearer"):
         #    self.state.enable_smearer = \
         #                        copy.deepcopy(self.enable_smearer.GetValue())
         #    self.state.disable_smearer = \
@@ -2749,108 +2671,15 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         #self.state.dI_didata = copy.deepcopy(self.dI_didata.GetValue())
         #self.state.dI_sqrdata = copy.deepcopy(self.dI_sqrdata.GetValue())
         #self.state.dI_idata = copy.deepcopy(self.dI_idata.GetValue())
-        #if hasattr(self, "disp_box") and self.disp_box is not None:
-        #    self.state.disp_box = self.disp_box.GetCurrentSelection()
-
-        #    if len(self.disp_cb_dict) > 0:
-        #        for k, v in self.disp_cb_dict.items():
-        #            if v is None:
-        #                self.state.disp_cb_dict[k] = v
-        #            else:
-        #                try:
-        #                    self.state.disp_cb_dict[k] = v.GetValue()
-        #                except Exception:
-        #                    self.state.disp_cb_dict[k] = None
-        #    if len(self._disp_obj_dict) > 0:
-        #        for k, v in self._disp_obj_dict.items():
-        #            self.state.disp_obj_dict[k] = v.type
-
-        #    self.state.values = copy.deepcopy(self.values)
-        #    self.state.weights = copy.deepcopy(self.weights)
-
 
         p = self.model_parameters
         # save checkbutton state and txtcrtl values
-        state.parameters = self.getStandardParam()
-        state.orientation_params_disp = self.getOrientationParam()
+        state.parameters = FittingUtilities.getStandardParam()
+        state.orientation_params_disp = FittingUtilities.getOrientationParam()
 
         #self._copy_parameters_state(self.orientation_params_disp, self.state.orientation_params_disp)
         #self._copy_parameters_state(self.parameters, self.state.parameters)
         #self._copy_parameters_state(self.fittable_param, self.state.fittable_param)
         #self._copy_parameters_state(self.fixed_param, self.state.fixed_param)
 
-    def getStandardParam(self):
-        """
-        Returns a list with standard parameters for the current model
-        """
-        param = []
-        for param_name in list(self.kernel_module.params.keys()):
-            checkbox_state = param_name in self.parameters_to_fit
-            name = param_name
-            value = self.kernel_module.params[param_name]
-            min_state = True
-            max_state = True
-            error_state = False
-            error_value = 0.0
-            details = self.kernel_module.details[param_name] #[unit, mix, max]
-            param.append([checkbox_state, name, value, "",
-                          [error_state, error_value],
-                          [min_state, details[1]],
-                          [max_state, details[2]], details[0]])
-
-        return param
-
-    def getOrientationParam(self):
-        """
-        Get the dictionary with orientation parameters
-        """
-        param = []
-        for param_name in list(self.kernel_module.params.keys()):
-            name = param_name
-            value = self.kernel_module.params[param_name]
-            min_state = True
-            max_state = True
-            error_state = False
-            error_value = 0.0
-            checkbox_state = True #??
-            details = self.kernel_module.details[param_name] #[unit, mix, max]
-            param.append([checkbox_state, name, value, "",
-                          [error_state, error_value],
-                          [min_state, details[1]],
-                          [max_state, details[2]], details[0]])
-
-        return param
-
-    def getDispParam(self, params):
-        """
-        Get the dictionary with dispersion parameters
-        """
-        pass
-
-    def setParam(self, name, value):
-        """
-        Set the value of a model parameter
-
-        :param name: name of the parameter
-        :param value: value of the parameter
-
-        """
-        # Look for dispersion parameters
-        disp = {}
-        toks = name.split('.')
-        if len(toks)==2:
-            for item in self.dispersion.keys():
-                if item.lower()==toks[0].lower():
-                    for par in self.dispersion[item]:
-                        if par.lower() == toks[1].lower():
-                            self.dispersion[item][par] = value
-                            return
-        else:
-            # Look for standard parameter
-            for item in self.params.keys():
-                if item.lower()==name.lower():
-                    self.params[item] = value
-                    return
-
-        raise ValueError("Model does not contain parameter %s" % name)
 

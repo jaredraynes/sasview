@@ -499,7 +499,10 @@ class GuiManager(object):
         """
         report_list = None
         if getattr(self._current_perspective, "currentTab"):
-            report_list = self._current_perspective.currentTab.getReport()
+            try:
+                report_list = self._current_perspective.currentTab.getReport()
+            except Exception as ex:
+                logging.error("Report generation failed with: " + str(ex))
 
         if report_list is not None:
             self.report_dialog = ReportDialog(parent=self, report_list=report_list)

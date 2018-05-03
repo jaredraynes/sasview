@@ -376,6 +376,29 @@ def itemFromFilename(filename, model_item):
                  if str(i.text()) == filename])
     return item[0] if len(item)>0 else None
 
+def plotsFromModel(model_name, model_item):
+    """
+    Returns the list of plots for the item with model name in the model
+    """
+    assert isinstance(model_item, QtGui.QStandardItem)
+    assert isinstance(model_name, str)
+
+    plot_data = []
+    # Iterate over model looking for named items
+    for index in range(model_item.rowCount()):
+        item = model_item.child(index)
+        if isinstance(item.data(), (Data1D, Data2D)):
+            plot_data.append(item.data())
+        if model_name in str(item.text()):
+            #plot_data.append(item.child(0).data())
+            # Going 1 level deeper only
+            for index_2 in range(item.rowCount()):
+                item_2 = item.child(index_2)
+                if item_2 and isinstance(item_2.data(), (Data1D, Data2D)):
+                    plot_data.append(item_2.data())
+
+    return plot_data
+
 def plotsFromFilename(filename, model_item):
     """
     Returns the list of plots for the item with text=filename in the model
