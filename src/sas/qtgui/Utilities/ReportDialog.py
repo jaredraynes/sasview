@@ -4,6 +4,7 @@ import logging
 import webbrowser
 
 from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtPrintSupport
 
 import sas.qtgui.Utilities.GuiUtils as GuiUtils
 
@@ -45,7 +46,20 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
         """
         Display the print dialog and send the report to printer
         """
-        pass
+        # Define the printer
+        printer = QtPrintSupport.QPrinter()
+
+        # Display the print dialog
+        dialog = QtPrintSupport.QPrintDialog(printer)
+        dialog.setModal(True)
+        dialog.setWindowTitle("Print")
+        if dialog.exec_() != QtWidgets.QDialog.Accepted:
+            return
+
+        try:
+            self.txtBrowser.document().print(printer)
+        except Exception as ex:
+            logging.error("Print report failed with: " + str(ex))
 
     def onSave(self):
         """
