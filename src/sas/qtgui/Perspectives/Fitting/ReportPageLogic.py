@@ -3,6 +3,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from io import BytesIO
 import base64
 import datetime
+import re
 
 from sas.qtgui.Plotting.Plotter import Plotter
 from sas.qtgui.Plotting.Plotter2D import Plotter2D
@@ -24,6 +25,11 @@ class ReportPageLogic(object):
         self._index = index
         self.model = model
 
+    def cleanhtml(self, raw_html):
+        cleanr = re.compile('<.*?>')
+        cleantext = re.sub(cleanr, '', raw_html)
+        return cleantext
+
     def reportList(self):
         """
         Return the HTML version of the full report
@@ -39,7 +45,11 @@ class ReportPageLogic(object):
 
         report_parameters = self.reportParams()
 
-        report_list = report_header + report_parameters + imagesHTML
+        report_html = report_header + report_parameters + imagesHTML
+
+        report_txt = self.cleanhtml(report_html)
+
+        report_list = [report_html, report_txt, images]
 
         return report_list
 

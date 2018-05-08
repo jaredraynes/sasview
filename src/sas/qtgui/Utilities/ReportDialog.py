@@ -19,13 +19,16 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
         super(ReportDialog, self).__init__(parent._parent)
         self.setupUi(self)
 
-        self.data = report_list
+        assert(isinstance(report_list, list))
+        assert(len(report_list) == 3)
+
+        self.data_html, self.data_txt, self.data_images = report_list
         self.parent = parent
         if hasattr(self.parent, "communicate"):
             self.communicate = parent.communicate
 
         # Fill in the table from input data
-        self.setupDialog(self.data)
+        self.setupDialog(self.data_html)
 
         # Command buttons
         self.cmdPrint.clicked.connect(self.onPrint)
@@ -64,20 +67,67 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
             return
         extension = filename_tuple[1]
         try:
-            ext =  extension[extension.find("(")+1:extension.find(")")]
+            ext =  extension[extension.find("(")+2:extension.find(")")]
         except IndexError as ex:
             # (ext) not found...
             logging.error("Error while saving report. " + str(ex))
             return
-        _, extension = os.path.splitext(filename)
+        basename, extension = os.path.splitext(filename)
         if not extension:
             filename = '.'.join((filename, ext))
 
-        if ext.lower() == ".txt":
-            onTXTSave(self.data, filename)
-        if ext.lower() == ".pdf":
-            self.HTML2PDF(self.data, filename)
+        pictures = self.getPictures(basename)
 
+        # translate png references int html from in-memory name to on-disk name
+        # TODO: fix for Qt5 - replace "data:image/png..." with basename+'_img.png'
+        html = self.data_html.replace("memory:img_fit", basename+'_img')
+
+        if ext.lower() == ".txt":
+            self.onTXTSave(self.data_txt, filename)
+        if ext.lower() == ".html":
+            self.onHTMLSave(html, filename)
+        if ext.lower() == ".pdf":
+            pdf_success = self.HTML2PDF(html, filename)
+            # delete images used to create the pdf
+            for pic_name in pictures:
+                os.remove(pic_name)
+            #open pdf viewer
+            if pdf_success:
+                try:
+                    if os.name == 'nt':  # Windows
+                        os.startfile(filename)
+                    elif sys.platform == "darwin":  # Mac
+                        os.system("open %s" % filename)
+                except Exception as exc:
+                    # cannot open pdf
+                    logging.error(str(exc))
+
+    def getPictures(self, basename):
+        """
+        Returns list of saved MPL figures
+        """
+        # save figures
+        pictures = []
+        for num, image in enumerate(self.data_images):
+            pic_name = basename + '_img%s.png' % num
+            # save the image for use with pdf writer
+            image.savefig(pic_name)
+            pictures.append(pic_name)
+        return pictures
+
+    def onTXTSave(self, data, filename):
+        """
+        Simple txt file serializatio
+        """
+        with open(filename, 'w') as f:
+            f.write(data)
+
+    def onHTMLSave(self, html, filename):
+        """
+        HTML file write
+        """
+        with open(filename, 'w') as f:
+            f.write(html)
 
     def HTML2PDF(self, data, filename):
         """
@@ -94,10 +144,9 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
             pisaStatus = pisa.CreatePDF(data, dest=resultFile)
             # close output file
             resultFile.close()
-            self.Update()
             return pisaStatus.err
-        except Exception:
-            logging.error("Error creating pdf: %s" % sys.exc_value)
+        except Exception as ex:
+            logging.error("Error creating pdf: %s" % str(ex))
         return False
 
 
