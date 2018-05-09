@@ -1,14 +1,10 @@
 import os
 import re
-import time
 import logging
-import webbrowser
 from xhtml2pdf import pisa
 
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtWidgets
 from PyQt5 import QtPrintSupport
-
-import sas.qtgui.Utilities.GuiUtils as GuiUtils
 
 from sas.qtgui.Utilities.UI.ReportDialogUI import Ui_ReportDialogUI
 
@@ -17,13 +13,13 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
     """
     Class for stateless grid-like printout of model parameters for mutiple models
     """
-    def __init__(self, parent = None, report_list=None):
+    def __init__(self, parent=None, report_list=None):
 
         super(ReportDialog, self).__init__(parent._parent)
         self.setupUi(self)
 
-        assert(isinstance(report_list, list))
-        assert(len(report_list) == 3)
+        assert isinstance(report_list, list)
+        assert len(report_list) == 3
 
         self.data_html, self.data_txt, self.data_images = report_list
         self.parent = parent
@@ -58,9 +54,13 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
         if dialog.exec_() != QtWidgets.QDialog.Accepted:
             return
 
+        document = self.txtBrowser.document()
         try:
-            self.txtBrowser.document().print(printer)
+            # pylint chokes on this line with syntax-error
+            # pylint: disable=syntax-error doesn't seem to help
+            document.print(printer)
         except Exception as ex:
+            # Printing can return various exceptions, let's catch them all
             logging.error("Print report failed with: " + str(ex))
 
     def onSave(self):
@@ -87,7 +87,7 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
         try:
             # extract extension from filter
             # e.g. "PDF file (*.pdf)" -> ".pdf"
-            ext =  extension[extension.find("(")+2:extension.find(")")]
+            ext = extension[extension.find("(")+2:extension.find(")")]
         except IndexError as ex:
             # (ext) not found...
             logging.error("Error while saving report. " + str(ex))
@@ -167,14 +167,13 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
         : filename: name of file to be saved
         """
         try:
-            from xhtml2pdf import pisa
             # open output file for writing (truncated binary)
-            with open(filename, "w+b") as resultFile: 
+            with open(filename, "w+b") as resultFile:
                 # convert HTML to PDF
                 pisaStatus = pisa.CreatePDF(data, dest=resultFile)
                 return pisaStatus.err
         except Exception as ex:
-            logging.error("Error creating pdf: %s" % str(ex))
+            logging.error("Error creating pdf: " + str(ex))
         return False
 
 

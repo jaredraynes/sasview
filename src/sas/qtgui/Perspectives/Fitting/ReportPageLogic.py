@@ -1,9 +1,11 @@
-import urllib.parse
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from io import BytesIO
 import base64
 import datetime
 import re
+import logging
+from io import BytesIO
+import urllib.parse
+
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 from sas.qtgui.Plotting.Plotter import Plotter
 from sas.qtgui.Plotting.Plotter2D import Plotter2D
@@ -25,7 +27,9 @@ class ReportPageLogic(object):
         self._index = index
         self.model = model
 
-    def cleanhtml(self, raw_html):
+    @staticmethod
+    def cleanhtml(raw_html):
+        """Remove html tags from a document"""
         cleanr = re.compile('<.*?>')
         cleantext = re.sub(cleanr, '', raw_html)
         return cleantext
@@ -90,7 +94,6 @@ class ReportPageLogic(object):
 
     def buildPlotsForReport(self, images):
         """ Convert Matplotlib figure 'fig' into a <img> tag for HTML use using base64 encoding. """
-  
         html = FEET_1 % self.data.filename
 
         for fig in images:
@@ -161,9 +164,8 @@ class ReportPageLogic(object):
                 msg = "Incorrect data type passed to Plotting"
                 raise AttributeError(msg)
 
-        if 'new_plot' in locals() and \
-            isinstance(new_plot.data, Data1D):
-                graphs.append(new_plot.figure)
+        if 'new_plot' in locals() and isinstance(new_plot.data, Data1D):
+            graphs.append(new_plot.figure)
 
         return graphs
 
