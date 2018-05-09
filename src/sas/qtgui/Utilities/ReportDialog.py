@@ -1,7 +1,9 @@
 import os
+import re
 import time
 import logging
 import webbrowser
+from xhtml2pdf import pisa
 
 from PyQt5 import QtCore, QtWidgets
 from PyQt5 import QtPrintSupport
@@ -65,22 +67,26 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
         """
         Display the Save As... prompt and save the report if instructed so
         """
-        # choose user's home directory
+        # Choose user's home directory
         location = os.path.expanduser('~')
-        default_name = os.path.join(location, 'fitting_report.pdf')
+        # Use a sensible filename default
+        default_name = os.path.join(location, 'fit_report.pdf')
         kwargs = {
-            'parent': self,
-            'caption'   : 'Save Report',
+            'parent'   : self,
+            'caption'  : 'Save Report',
             'directory': default_name,
-            'filter': 'PDF file (*.pdf);;HTML file (*.html);;Text file (*.txt)',
-            'options': QtWidgets.QFileDialog.DontUseNativeDialog}
+            'filter'   : 'PDF file (*.pdf);;HTML file (*.html);;Text file (*.txt)',
+            'options'  : QtWidgets.QFileDialog.DontUseNativeDialog}
         # Query user for filename.
         filename_tuple = QtWidgets.QFileDialog.getSaveFileName(**kwargs)
         filename = filename_tuple[0]
         if not filename:
             return
         extension = filename_tuple[1]
+
         try:
+            # extract extension from filter
+            # e.g. "PDF file (*.pdf)" -> ".pdf"
             ext =  extension[extension.find("(")+2:extension.find(")")]
         except IndexError as ex:
             # (ext) not found...
@@ -90,11 +96,17 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
         if not extension:
             filename = '.'.join((filename, ext))
 
+        # Create files with charts
         pictures = self.getPictures(basename)
 
-        # translate png references int html from in-memory name to on-disk name
-        # TODO: fix for Qt5 - replace "data:image/png..." with basename+'_img.png'
-        html = self.data_html.replace("memory:img_fit", basename+'_img')
+        # translate png references into html from base64 string to on-disk name
+        cleanr = re.compile('<img src="data:image.*>')
+        replacement_name = ""
+        for picture in pictures:
+            replacement_name += '<img src="'+ picture + '"><p></p>'
+
+        # <img src="data:image/png;.*>  => <img src=filename>
+        html = re.sub(cleanr, replacement_name, self.data_html)
 
         if ext.lower() == ".txt":
             self.onTXTSave(self.data_txt, filename)
@@ -106,15 +118,16 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
             for pic_name in pictures:
                 os.remove(pic_name)
             #open pdf viewer
-            if pdf_success:
+            if pdf_success == 0:
                 try:
                     if os.name == 'nt':  # Windows
                         os.startfile(filename)
                     elif sys.platform == "darwin":  # Mac
                         os.system("open %s" % filename)
-                except Exception as exc:
-                    # cannot open pdf
-                    logging.error(str(exc))
+                except Exception as ex:
+                    # cannot open pdf.
+                    # We don't know what happened in os.* , so broad Exception is required
+                    logging.error(str(ex))
 
     def getPictures(self, basename):
         """
@@ -129,21 +142,24 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
             pictures.append(pic_name)
         return pictures
 
-    def onTXTSave(self, data, filename):
+    @staticmethod
+    def onTXTSave(data, filename):
         """
         Simple txt file serializatio
         """
         with open(filename, 'w') as f:
             f.write(data)
 
-    def onHTMLSave(self, html, filename):
+    @staticmethod
+    def onHTMLSave(html, filename):
         """
         HTML file write
         """
         with open(filename, 'w') as f:
             f.write(html)
 
-    def HTML2PDF(self, data, filename):
+    @staticmethod
+    def HTML2PDF(data, filename):
         """
         Create a PDF file from html source string.
         Returns True is the file creation was successful.
@@ -153,12 +169,10 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
         try:
             from xhtml2pdf import pisa
             # open output file for writing (truncated binary)
-            resultFile = open(filename, "w+b")
-            # convert HTML to PDF
-            pisaStatus = pisa.CreatePDF(data, dest=resultFile)
-            # close output file
-            resultFile.close()
-            return pisaStatus.err
+            with open(filename, "w+b") as resultFile: 
+                # convert HTML to PDF
+                pisaStatus = pisa.CreatePDF(data, dest=resultFile)
+                return pisaStatus.err
         except Exception as ex:
             logging.error("Error creating pdf: %s" % str(ex))
         return False

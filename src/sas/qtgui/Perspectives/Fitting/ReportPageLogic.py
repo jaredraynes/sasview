@@ -34,6 +34,12 @@ class ReportPageLogic(object):
         """
         Return the HTML version of the full report
         """
+        if self.kernel_module is None:
+            report_txt = "No model defined"
+            report_html = HEADER % report_txt
+            images = []
+            return [report_html, report_txt, images]
+
         # Get plot image from plotpanel
         images = self.getImages()
 
@@ -63,8 +69,12 @@ class ReportPageLogic(object):
         current_time = datetime.datetime.now().strftime("%I:%M%p, %B %d, %Y")
         filename = self.data.filename
         modelname = self.kernel_module.id
-        qrange_min = min(self.data.x)
-        qrange_max = max(self.data.x)
+        if hasattr(self.data, 'xmin'):
+            qrange_min = self.data.xmin
+            qrange_max = self.data.xmax
+        else:
+            qrange_min = min(self.data.x)
+            qrange_max = max(self.data.x)
         qrange = "min = {}, max = {}".format(qrange_min, qrange_max)
 
         title = title + " [" + current_time + "]"
@@ -103,15 +113,20 @@ class ReportPageLogic(object):
 
         report = ""
         for value in pars:
-            par_name = value[1]
-            par_fixed = not value[0]
-            par_value = value[2]
-            par_unit = value[7]
-            if par_fixed:
-                error = "(fixed)"
-            else:
-                error = str(value[4][1])
-            param = par_name + " = " + par_value + " ± " + error + " " + par_unit
+            try:
+                par_name = value[1]
+                par_fixed = not value[0]
+                par_value = value[2]
+                par_unit = value[7]
+                if par_fixed:
+                    error = "(fixed)"
+                else:
+                    error = str(value[4][1])
+                param = par_name + " = " + par_value + " ± " + error + " " + par_unit
+            except IndexError as ex:
+                # corrupted model. Complain and skip the line
+                logging.error("Error in parsing parameters: "+str(ex))
+                continue
             report += CENTRE % param + "\n"
 
         return report
@@ -137,7 +152,6 @@ class ReportPageLogic(object):
                 if not 'new_plot' in locals():
                     new_plot = Plotter(self, quickplot=True)
                 new_plot.plot(plot_set)
-                # active_plots may contain multiple charts
             elif isinstance(plot_set, Data2D):
                 plot2D = Plotter2D(self, quickplot=True)
                 plot2D.item = self._index

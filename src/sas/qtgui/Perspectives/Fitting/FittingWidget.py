@@ -2562,10 +2562,6 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         """
         Create and return HTML report with parameters and charts
         """
-        model = self.kernel_module
-        if model is None:
-            return HEADER % "No model defined"
-
         report_logic = ReportPageLogic(self,
                                        kernel_module=self.kernel_module,
                                        data=self.data,
