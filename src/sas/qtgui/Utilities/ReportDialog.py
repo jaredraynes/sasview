@@ -22,9 +22,6 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
         assert len(report_list) == 3
 
         self.data_html, self.data_txt, self.data_images = report_list
-        self.parent = parent
-        if hasattr(self.parent, "communicate"):
-            self.communicate = parent.communicate
 
         # Fill in the table from input data
         self.setupDialog(self.data_html)

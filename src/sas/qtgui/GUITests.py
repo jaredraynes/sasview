@@ -47,6 +47,7 @@ from Utilities.UnitTesting import GridPanelTest
 from Utilities.UnitTesting import ModelEditorTest
 from Utilities.UnitTesting import PluginDefinitionTest
 from Utilities.UnitTesting import TabbedModelEditorTest
+from Utilities.UnitTesting import ReportDialogTest
 
 # Unit Testing
 from UnitTesting import TestUtilsTest
@@ -106,6 +107,7 @@ def suite():
         unittest.makeSuite(ModelEditorTest.ModelEditorTest,            'test'),
         unittest.makeSuite(PluginDefinitionTest.PluginDefinitionTest,  'test'),
         unittest.makeSuite(TabbedModelEditorTest.TabbedModelEditorTest,'test'),
+        unittest.makeSuite(ReportDialogTest.ReportDialogTest,     'test'),
 
         # Calculators
         unittest.makeSuite(KiessigCalculatorTest.KiessigCalculatorTest,                     'test'),
