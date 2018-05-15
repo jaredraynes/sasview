@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import base64
 import datetime
 import re
@@ -115,17 +116,20 @@ class ReportPageLogic(object):
             return ""
 
         report = ""
+        plus_minus = " &#177; "
         for value in pars:
             try:
                 par_name = value[1]
                 par_fixed = not value[0]
                 par_value = value[2]
                 par_unit = value[7]
+                # Convert units for nice display
+                par_unit = GuiUtils.convertUnitToHTML(par_unit.strip())
                 if par_fixed:
                     error = "(fixed)"
                 else:
                     error = str(value[4][1])
-                param = par_name + " = " + par_value + " ± " + error + " " + par_unit
+                param = par_name + " = " + par_value + plus_minus + error + " " + par_unit
             except IndexError as ex:
                 # corrupted model. Complain and skip the line
                 logging.error("Error in parsing parameters: "+str(ex))
