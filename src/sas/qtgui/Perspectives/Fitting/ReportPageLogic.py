@@ -103,7 +103,8 @@ class ReportPageLogic(object):
             canvas.print_png(png_output)
             data = png_output.getvalue()
             data64 = base64.b64encode(data)
-            html += '<img src="data:image/png;base64,{}">'.format(urllib.parse.quote(data64))
+            data_to_print = urllib.parse.quote(data64)
+            html += '<img src="data:image/png;base64,{}">'.format(data_to_print)
 
         return html
 
@@ -126,10 +127,10 @@ class ReportPageLogic(object):
                 # Convert units for nice display
                 par_unit = GuiUtils.convertUnitToHTML(par_unit.strip())
                 if par_fixed:
-                    error = "(fixed)"
+                    error = " (fixed)"
                 else:
-                    error = str(value[4][1])
-                param = par_name + " = " + par_value + plus_minus + error + " " + par_unit
+                    error = plus_minus + str(value[4][1])
+                param = par_name + " = " + par_value + error + " " + par_unit
             except IndexError as ex:
                 # corrupted model. Complain and skip the line
                 logging.error("Error in parsing parameters: "+str(ex))
@@ -178,7 +179,7 @@ class ReportPageLogic(object):
 HEADER = "<html>\n"
 HEADER += "<head>\n"
 HEADER += "<meta http-equiv=Content-Type content='text/html; "
-HEADER += "charset=windows-1252'> \n"
+HEADER += "charset=utf-8'> \n"
 HEADER += "<meta name=Generator >\n"
 HEADER += "</head>\n"
 HEADER += "<body lang=EN-US>\n"
@@ -202,7 +203,7 @@ FEET_1 = \
 <br><font size='4' >Data: "%s"</font><br>
 """
 FEET_2 = \
-"""<img src="%s" ></img>
+"""<img src="%s" width="540"></img>
 """
 ELINE = """<p class=MsoNormal>&nbsp;</p>
 """

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Global defaults and various utility functions usable by the general GUI
 """
@@ -860,6 +861,53 @@ def formatNumber(value, high=False):
     else:
         output = "%-5.3g" % value
     return output.lstrip().rstrip()
+
+def replaceHTMLwithUTF8(html):
+    """
+    Replace some important HTML-encoded characters
+    with their UTF-8 equivalents
+    """
+    # Angstrom
+    html_out = html.replace("&#x212B;", "Å")
+    # infinity
+    html_out = html_out.replace("&#x221e;", "∞")
+    # +/-
+    html_out = html_out.replace("&#177;", "±")
+
+    return html_out
+
+def replaceHTMLwithASCII(html):
+    """
+    Replace some important HTML-encoded characters
+    with their ASCII equivalents
+    """
+    # Angstrom
+    html_out = html.replace("&#x212B;", "Ang")
+    # infinity
+    html_out = html_out.replace("&#x221e;", "inf")
+    # +/-
+    html_out = html_out.replace("&#177;", "+/-")
+
+    return html_out
+
+def convertUnitToUTF8(unit):
+    """
+    Convert ASCII unit display into UTF-8 symbol
+    """
+    if unit == "1/A":
+        return "Å<sup>-1</sup>"
+    elif unit == "1/cm":
+        return "cm<sup>-1</sup>"
+    elif unit == "Ang":
+        return "Å"
+    elif unit == "1e-6/Ang^2":
+        return "10<sup>-6</sup>/Å<sup>2</sup>"
+    elif unit == "inf":
+        return "∞"
+    elif unit == "-inf":
+        return "-∞"
+    else:
+        return unit
 
 def convertUnitToHTML(unit):
     """

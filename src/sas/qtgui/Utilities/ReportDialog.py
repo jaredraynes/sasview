@@ -7,6 +7,8 @@ from xhtml2pdf import pisa
 from PyQt5 import QtWidgets
 from PyQt5 import QtPrintSupport
 
+import sas.qtgui.Utilities.GuiUtils as GuiUtils
+
 from sas.qtgui.Utilities.UI.ReportDialogUI import Ui_ReportDialogUI
 
 
@@ -107,11 +109,13 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
         html = re.sub(cleanr, replacement_name, self.data_html)
 
         if ext.lower() == ".txt":
-            self.onTXTSave(self.data_txt, filename)
+            txt_ascii = GuiUtils.replaceHTMLwithASCII(self.data_txt)
+            self.onTXTSave(txt_ascii, filename)
         if ext.lower() == ".html":
             self.onHTMLSave(html, filename)
         if ext.lower() == ".pdf":
-            pdf_success = self.HTML2PDF(html, filename)
+            html_utf = GuiUtils.replaceHTMLwithUTF8(html)
+            pdf_success = self.HTML2PDF(html_utf, filename)
             # delete images used to create the pdf
             for pic_name in pictures:
                 os.remove(pic_name)
@@ -168,7 +172,9 @@ class ReportDialog(QtWidgets.QDialog, Ui_ReportDialogUI):
             # open output file for writing (truncated binary)
             with open(filename, "w+b") as resultFile:
                 # convert HTML to PDF
-                pisaStatus = pisa.CreatePDF(data, dest=resultFile)
+                pisaStatus = pisa.CreatePDF(data.encode("UTF-8"),
+                                            dest=resultFile,
+                                            encoding='UTF-8')
                 return pisaStatus.err
         except Exception as ex:
             logging.error("Error creating pdf: " + str(ex))
