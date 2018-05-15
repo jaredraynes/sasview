@@ -151,7 +151,7 @@ class ReportPageLogic(object):
         # All same-type charts in one plot
         for plot_set in plots:
             if isinstance(plot_set, Data1D):
-                if 'esiduals' in plot_set.title:
+                if 'residuals' in plot_set.title.lower():
                     res_plot = Plotter(self, quickplot=True)
                     res_plot.plot(plot_set)
                     graphs.append(res_plot.figure)
