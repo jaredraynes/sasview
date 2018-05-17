@@ -7,8 +7,6 @@ their distribution as a function of D_max.
 """
 
 # global
-import sys
-import os
 import logging
 import numpy as np
 from PyQt5 import QtCore
@@ -41,6 +39,7 @@ class DmaxWindow(QtWidgets.QDialog, Ui_DmaxExplorer):
     def __init__(self, pr_state, nfunc, parent=None):
         super(DmaxWindow, self).__init__()
         self.setupUi(self)
+        self.parent = parent
 
         self.setWindowTitle("Dₐₓ Explorer")
 
@@ -49,18 +48,18 @@ class DmaxWindow(QtWidgets.QDialog, Ui_DmaxExplorer):
         self.communicator = GuiUtils.Communicate()
 
         self.plot = PlotterWidget(self, self)
-        self.hasPlot = None
+        self.hasPlot = False
         self.verticalLayout.insertWidget(0, self.plot)
 
         # Let's choose the Standard Item Model.
         self.model = QtGui.QStandardItemModel(self)
-        self.mapper = None
+        self.mapper = QtWidgets.QDataWidgetMapper(self)
 
         # Add validators on line edits
         self.setupValidators()
 
-        # # Connect buttons to slots.
-        # # Needs to be done early so default values propagate properly.
+        # Connect buttons to slots.
+        # Needs to be done early so default values propagate properly.
         self.setupSlots()
 
         # Set up the model.
@@ -81,13 +80,20 @@ class DmaxWindow(QtWidgets.QDialog, Ui_DmaxExplorer):
         self.dependentVariable.currentIndexChanged.connect(lambda:self.modelChanged(None))
 
     def setupModel(self):
+        self.model.blockSignals(True)
         self.model.setItem(W.NPTS, QtGui.QStandardItem(str(self.nfunc)))
+        self.model.blockSignals(False)
+        self.model.blockSignals(True)
         self.model.setItem(W.DMIN, QtGui.QStandardItem("{:.1f}".format(0.9*self.pr_state.d_max)))
+        self.model.blockSignals(False)
+        self.model.blockSignals(True)
         self.model.setItem(W.DMAX, QtGui.QStandardItem("{:.1f}".format(1.1*self.pr_state.d_max)))
+        self.model.blockSignals(False)
+        self.model.blockSignals(True)
         self.model.setItem(W.VARIABLE, QtGui.QStandardItem( "χ²/dof"))
+        self.model.blockSignals(False)
 
     def setupMapper(self):
-        self.mapper = QtWidgets.QDataWidgetMapper(self)
         self.mapper.setOrientation(QtCore.Qt.Vertical)
         self.mapper.setModel(self.model)
 
@@ -110,9 +116,15 @@ class DmaxWindow(QtWidgets.QDialog, Ui_DmaxExplorer):
         bck = []
         chi2 = []
 
-        xs = np.linspace(float(self.model.item(W.DMIN).text()),
-                         float(self.model.item(W.DMAX).text()),
-                         float(self.model.item(W.NPTS).text()))
+        try:
+            dmin = float(self.model.item(W.DMIN).text())
+            dmax = float(self.model.item(W.DMAX).text())
+            npts = float(self.model.item(W.NPTS).text())
+            xs = np.linspace(dmin, dmax, npts)
+        except ValueError as e:
+            msg = ("An input value is not correctly formatted. Please check {}"
+                   .format(e.message))
+            logger.error(msg)
 
         original = self.pr_state.d_max
         for x in xs:
@@ -131,7 +143,6 @@ class DmaxWindow(QtWidgets.QDialog, Ui_DmaxExplorer):
                 # This inversion failed, skip this D_max value
                 msg = "ExploreDialog: inversion failed "
                 msg += "for D_max=%s\n%s" % (str(x), ex)
-                print(msg)
                 logger.error(msg)
 
         #Return the invertor to its original state
@@ -141,7 +152,6 @@ class DmaxWindow(QtWidgets.QDialog, Ui_DmaxExplorer):
         except RuntimeError as ex:
             msg = "ExploreDialog: inversion failed "
             msg += "for D_max=%s\n%s" % (str(x), ex)
-            print(msg)
             logger.error(msg)
 
         plotter = self.model.item(W.VARIABLE).text()
@@ -150,16 +160,16 @@ class DmaxWindow(QtWidgets.QDialog, Ui_DmaxExplorer):
         x_unit = "A"
         if plotter == "χ²/dof":
             ys = chi2
-            y_label = "\chi^2/dof"
+            y_label = "\\chi^2/dof"
             y_unit = "a.u."
         elif plotter == "I(Q=0)":
             ys = iq0
             y_label = "I(q=0)"
-            y_unit = "\AA^{-1}"
+            y_unit = "\\AA^{-1}"
         elif plotter == "Rg":
             ys = rg
             y_label = "R_g"
-            y_unit = "\AA"
+            y_unit = "\\AA"
         elif plotter == "Oscillation parameter":
             ys = osc
             y_label = "Osc"
@@ -167,14 +177,14 @@ class DmaxWindow(QtWidgets.QDialog, Ui_DmaxExplorer):
         elif plotter == "Background":
             ys = bck
             y_label = "Bckg"
-            y_unit = "\AA^{-1}"
+            y_unit = "\\AA^{-1}"
         elif plotter == "Positive Fraction":
             ys = pos
             y_label = "P^+"
             y_unit = "a.u."
         else:
             ys = pos_err
-            y_label = "P^{+}_{1\sigma}"
+            y_label = "P^{+}_{1\\sigma}"
             y_unit = "a.u."
 
         data = Data1D(xs, ys)
@@ -187,3 +197,8 @@ class DmaxWindow(QtWidgets.QDialog, Ui_DmaxExplorer):
         data._yaxis = y_label
         data._yunit = y_unit
         self.plot.plot(data=data, marker="-")
+
+    def closeEvent(self, event):
+        """Override close event"""
+        self.parent.dmaxWindow = None
+        event.accept()

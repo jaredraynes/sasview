@@ -46,7 +46,7 @@ class SlitSizeCalculator(QtWidgets.QDialog, Ui_SlitSizeCalculator):
         Calls DocumentationWindow with the path of the location within the
         documentation tree (after /doc/ ....".
         """
-        location = "/user/sasgui/perspectives/calculator/slit_calculator_help.html"
+        location = "/user/qtgui/Calculators/slit_calculator_help.html"
         self._parent.showHelp(location)
 
     def onBrowse(self):
@@ -114,8 +114,7 @@ class SlitSizeCalculator(QtWidgets.QDialog, Ui_SlitSizeCalculator):
         try:
             xdata = data.x
             ydata = data.y
-            #if xdata == [] or xdata is None or ydata == [] or ydata is None:
-            if (not xdata or xdata is None) or (not ydata or ydata is None):
+            if xdata == [] or xdata is None or ydata == [] or ydata is None:
                 msg = "The current data is empty please check x and y"
                 logging.error(msg)
                 return

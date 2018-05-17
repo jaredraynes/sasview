@@ -21,6 +21,8 @@ import sas.qtgui.Utilities.ObjectLibrary as ObjectLibrary
 from sas.qtgui.Utilities.TabbedModelEditor import TabbedModelEditor
 from sas.qtgui.Utilities.PluginManager import PluginManager
 from sas.qtgui.Utilities.ReportDialog import ReportDialog
+from sas.qtgui.Utilities.GridPanel import BatchOutputPanel
+
 from sas.qtgui.MainWindow.UI.AcknowledgementsUI import Ui_Acknowledgements
 from sas.qtgui.MainWindow.AboutBox import AboutBox
 from sas.qtgui.MainWindow.WelcomePanel import WelcomePanel
@@ -39,6 +41,8 @@ from sas.qtgui.Calculators.DataOperationUtilityPanel import DataOperationUtility
 import sas.qtgui.Perspectives as Perspectives
 from sas.qtgui.Perspectives.Fitting.FittingPerspective import FittingWindow
 from sas.qtgui.MainWindow.DataExplorer import DataExplorerWindow, DEFAULT_PERSPECTIVE
+
+from sas.qtgui.Utilities.AddMultEditor import AddMultEditor
 
 class Acknowledgements(QDialog, Ui_Acknowledgements):
     def __init__(self, parent=None):
@@ -61,6 +65,9 @@ class GuiManager(object):
 
         # Add signal callbacks
         self.addCallbacks()
+
+        # Assure model categories are available
+        self.addCategories()
 
         # Create the data manager
         # TODO: pull out all required methods from DataManager and reimplement
@@ -128,6 +135,7 @@ class GuiManager(object):
         self.ackWidget = Acknowledgements()
         self.aboutWidget = AboutBox()
         self.welcomePanel = WelcomePanel()
+        self.grid_window = None
 
         # Add calculators - floating for usability
         self.SLDCalculator = SldPanel(self)
@@ -137,6 +145,19 @@ class GuiManager(object):
         self.GENSASCalculator = GenericScatteringCalculator(self)
         self.ResolutionCalculator = ResolutionCalculatorPanel(self)
         self.DataOperation = DataOperationUtilityPanel(self)
+
+    def addCategories(self):
+        """
+        Make sure categories.json exists and if not compile it and install in ~/.sasview
+        """
+        try:
+            from sas.sascalc.fit.models import ModelManager
+            from sas.qtgui.Utilities.CategoryInstaller import CategoryInstaller
+            model_list = ModelManager().cat_model_list()
+            CategoryInstaller.check_install(model_list=model_list)
+        except Exception:
+            logger.error("%s: could not load SasView models")
+            logger.error(traceback.format_exc())
 
     def statusBarSetup(self):
         """
@@ -167,6 +188,7 @@ class GuiManager(object):
         """
         Open a local url in the default browser
         """
+        #location = os.path.join(GuiUtils.HELP_DIRECTORY_LOCATION, url)
         location = GuiUtils.HELP_DIRECTORY_LOCATION + url
         try:
             webbrowser.open('file://' + os.path.realpath(location))
@@ -261,6 +283,12 @@ class GuiManager(object):
         else:
             msg = "Guiframe does not have a current perspective"
             logging.info(msg)
+
+    def findItemFromFilename(self, filename):
+        """
+        Queries the data explorer for the index corresponding to the filename within
+        """
+        return self.filesWidget.itemFromFilename(filename)
 
     def quitApplication(self):
         """
@@ -403,10 +431,10 @@ class GuiManager(object):
         self._workspace.actionFit_Options.triggered.connect(self.actionFit_Options)
         self._workspace.actionGPU_Options.triggered.connect(self.actionGPU_Options)
         self._workspace.actionFit_Results.triggered.connect(self.actionFit_Results)
-        self._workspace.actionChain_Fitting.triggered.connect(self.actionChain_Fitting)
         self._workspace.actionAdd_Custom_Model.triggered.connect(self.actionAdd_Custom_Model)
         self._workspace.actionEdit_Custom_Model.triggered.connect(self.actionEdit_Custom_Model)
         self._workspace.actionManage_Custom_Models.triggered.connect(self.actionManage_Custom_Models)
+        self._workspace.actionAddMult_Models.triggered.connect(self.actionAddMult_Models)
         # Window
         self._workspace.actionCascade.triggered.connect(self.actionCascade)
         self._workspace.actionTile.triggered.connect(self.actionTile)
@@ -424,6 +452,8 @@ class GuiManager(object):
         self._workspace.actionAcknowledge.triggered.connect(self.actionAcknowledge)
         self._workspace.actionAbout.triggered.connect(self.actionAbout)
         self._workspace.actionCheck_for_update.triggered.connect(self.actionCheck_for_update)
+
+        self.communicate.sendDataToGridSignal.connect(self.showBatchOutput)
 
     #============ FILE =================
     def actionLoadData(self):
@@ -532,8 +562,24 @@ class GuiManager(object):
     def actionShow_Grid_Window(self):
         """
         """
-        print("actionShow_Grid_Window TRIGGERED")
-        pass
+        self.showBatchOutput(None)
+
+    def showBatchOutput(self, output_data):
+        """
+        Display/redisplay the batch fit viewer
+        """
+        if self.grid_window is None:
+            self.grid_window = BatchOutputPanel(parent=self, output_data=output_data)
+            subwindow = self._workspace.workspace.addSubWindow(self.grid_window)
+
+            #self.grid_window = BatchOutputPanel(parent=self, output_data=output_data)
+            self.grid_window.show()
+            return
+        if output_data:
+            self.grid_window.addFitResults(output_data)
+        self.grid_window.show()
+        if self.grid_window.windowState() == Qt.WindowMinimized:
+            self.grid_window.setWindowState(Qt.WindowActive)
 
     def actionHide_Toolbar(self):
         """
@@ -580,7 +626,6 @@ class GuiManager(object):
     def actionKiessig_Calculator(self):
         """
         """
-        #self.DVCalculator.show()
         self.KIESSIGCalculator.show()
 
     def actionSlit_Size_Calculator(self):
@@ -591,12 +636,20 @@ class GuiManager(object):
     def actionSAS_Resolution_Estimator(self):
         """
         """
-        self.ResolutionCalculator.show()
+        try:
+            self.ResolutionCalculator.show()
+        except Exception as ex:
+            logging.error(str(ex))
+            return
 
     def actionGeneric_Scattering_Calculator(self):
         """
         """
-        self.GENSASCalculator.show()
+        try:
+            self.GENSASCalculator.show()
+        except Exception as ex:
+            logging.error(str(ex))
+            return
 
     def actionPython_Shell_Editor(self):
         """
@@ -665,12 +718,6 @@ class GuiManager(object):
         print("actionFit_Results TRIGGERED")
         pass
 
-    def actionChain_Fitting(self):
-        """
-        """
-        print("actionChain_Fitting TRIGGERED")
-        pass
-
     def actionAdd_Custom_Model(self):
         """
         """
@@ -688,6 +735,13 @@ class GuiManager(object):
         """
         self.model_manager = PluginManager(self)
         self.model_manager.show()
+
+    def actionAddMult_Models(self):
+        """
+        """
+        # Add Simple Add/Multiply Editor
+        self.add_mult_editor = AddMultEditor(self)
+        self.add_mult_editor.show()
 
     #============ ANALYSIS =================
     def actionFitting(self):
@@ -757,7 +811,8 @@ class GuiManager(object):
 
         TODO: use QNetworkAccessManager to assure _helpLocation is valid
         """
-        self.showHelp(self._helpLocation)
+        helpfile = "index.html"
+        self.showHelp(helpfile)
 
     def actionTutorial(self):
         """

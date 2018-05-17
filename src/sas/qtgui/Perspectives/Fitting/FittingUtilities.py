@@ -486,3 +486,18 @@ def getOrientationParam(kernel_module=None):
                      [max_state, details[2]], details[0]])
 
     return param
+
+def updateKernelWithResults(kernel, results):
+    """
+    Takes model kernel and applies results dict to its parameters,
+    returning the modified (deep) copy of the kernel.
+    """
+    assert(isinstance(results, dict))
+    local_kernel = copy.deepcopy(kernel)
+
+    for parameter in results.keys():
+        # Update the parameter value - note: this supports +/-inf as well
+        local_kernel.setParam(parameter, results[parameter][0])
+
+    return local_kernel
+
