@@ -2645,7 +2645,7 @@ class FittingWidget(QtWidgets.QWidget, Ui_FittingWidgetUI):
         report_logic = ReportPageLogic(self,
                                        kernel_module=self.kernel_module,
                                        data=self.data,
-                                       index=self._index,
+                                       index=self.all_data[self.data_index],
                                        model=self._model_model)
 
         return report_logic.reportList()
